@@ -1,0 +1,10 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AXEL | لوحة التحكم</title><link rel="stylesheet" href="css/style.css"></head><body><main class="container admin">
+<div class="panel"><span id="adminEmail"></span> <button id="logout" class="btn">خروج</button><h1>لوحة تحكم AXEL</h1><div class="stats"><div class="stat">المنتجات<b id="productsCount">0</b></div><div class="stat">الطلبات<b id="ordersCount">0</b></div><div class="stat">المبيعات<b id="salesCount">0</b></div></div></div>
+<div class="admin-grid section">
+<div class="panel"><h2>إضافة منتج ورفع الصور</h2>
+<label>لون الصور التي سترفعها</label><select id="colorSelect"><option>أبيض</option><option>لبني</option><option>بترولي</option></select>
+<input id="productImages" type="file" accept="image/*" multiple><div id="preview" class="upload-preview"></div><button id="uploadProductImages" type="button" class="btn">رفع الصور الآن</button><div class="progress"><i id="uploadBar"></i></div><p id="uploadStatus"></p>
+<form id="productForm"><input name="name" required placeholder="اسم المنتج"><select name="category"><option>تصميمات</option><option>أنمي</option></select><input name="salePrice" value="530" type="number"><input name="oldPrice" value="650" type="number"><textarea name="description">تيشيرت أوفر سايز بخامة مريحة وتصميم مميز.</textarea><button class="btn">حفظ المنتج</button></form></div>
+<div class="panel"><h2>رفع بانر</h2><input id="bannerFile" type="file" accept="image/*"><button id="bannerUpload" type="button" class="btn">رفع البانر</button><div class="progress"><i id="bannerBar"></i></div><hr><h2>إضافة عرض</h2><form id="offerForm"><input name="title" required placeholder="عنوان العرض"><input name="endsAt" type="datetime-local" required><button class="btn">إضافة العرض</button></form></div>
+<div class="panel"><h2>المنتجات</h2><div id="productsList"></div></div><div class="panel"><h2>آخر الطلبات</h2><div id="ordersList"></div></div>
+</div></main><script type="module" src="js/admin.js"></script></body></html>
