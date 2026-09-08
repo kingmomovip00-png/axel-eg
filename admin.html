@@ -1,10 +1,79 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AXEL | لوحة التحكم</title><link rel="stylesheet" href="css/style.css"></head><body><main class="container admin">
-<div class="panel"><span id="adminEmail"></span> <button id="logout" class="btn">خروج</button><h1>لوحة تحكم AXEL</h1><div class="stats"><div class="stat">المنتجات<b id="productsCount">0</b></div><div class="stat">الطلبات<b id="ordersCount">0</b></div><div class="stat">المبيعات<b id="salesCount">0</b></div></div></div>
-<div class="admin-grid section">
-<div class="panel"><h2>إضافة منتج ورفع الصور</h2>
-<label>لون الصور التي سترفعها</label><select id="colorSelect"><option>أبيض</option><option>لبني</option><option>بترولي</option></select>
-<input id="productImages" type="file" accept="image/*" multiple><div id="preview" class="upload-preview"></div><button id="uploadProductImages" type="button" class="btn">رفع الصور الآن</button><div class="progress"><i id="uploadBar"></i></div><p id="uploadStatus"></p>
-<form id="productForm"><input name="name" required placeholder="اسم المنتج"><select name="category"><option>تصميمات</option><option>أنمي</option></select><input name="salePrice" value="530" type="number"><input name="oldPrice" value="650" type="number"><textarea name="description">تيشيرت أوفر سايز بخامة مريحة وتصميم مميز.</textarea><button class="btn">حفظ المنتج</button></form></div>
-<div class="panel"><h2>رفع بانر</h2><input id="bannerFile" type="file" accept="image/*"><button id="bannerUpload" type="button" class="btn">رفع البانر</button><div class="progress"><i id="bannerBar"></i></div><hr><h2>إضافة عرض</h2><form id="offerForm"><input name="title" required placeholder="عنوان العرض"><input name="endsAt" type="datetime-local" required><button class="btn">إضافة العرض</button></form></div>
-<div class="panel"><h2>المنتجات</h2><div id="productsList"></div></div><div class="panel"><h2>آخر الطلبات</h2><div id="ordersList"></div></div>
-</div></main><script type="module" src="js/admin.js"></script></body></html>
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AXEL | لوحة التحكم</title><link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="header admin-header"><div class="container nav"><a class="nav-side" href="index.html">عرض المتجر</a><img src="assets/logo/logo.png" class="brand-logo"><button id="logout" class="btn small-btn">خروج</button></div></header>
+<main class="container admin">
+  <section class="panel admin-welcome"><div><p class="eyebrow">AXEL ADMIN</p><h1>لوحة التحكم</h1><p id="adminEmail" class="muted"></p></div>
+    <div class="stats"><div class="stat">المنتجات<b id="productsCount">0</b></div><div class="stat">الطلبات<b id="ordersCount">0</b></div><div class="stat">إجمالي المبيعات<b id="salesCount">0 ج</b></div></div>
+  </section>
+
+  <section class="admin-grid section">
+    <div class="panel">
+      <div class="section-title"><div><p class="eyebrow">PRODUCT</p><h2 id="productFormTitle">إضافة منتج</h2></div><button id="cancelEdit" type="button" class="btn ghost hidden">إلغاء التعديل</button></div>
+      <form id="productForm">
+        <input name="name" required placeholder="اسم المنتج">
+        <select name="category"><option>تصميمات</option><option>أنمي</option></select>
+        <div class="form-row"><input name="salePrice" value="530" type="number" min="1" placeholder="سعر البيع"><input name="oldPrice" value="650" type="number" min="0" placeholder="السعر القديم"></div>
+        <textarea name="description" placeholder="وصف المنتج">تيشيرت أوفر سايز بخامة مريحة وتصميم مميز.</textarea>
+
+        <h3>الألوان المتاحة</h3>
+        <div id="colorChoices" class="choice-grid">
+          <label class="choice-check"><input type="checkbox" value="أبيض" checked><span>أبيض</span></label>
+          <label class="choice-check"><input type="checkbox" value="أسود"><span>أسود</span></label>
+          <label class="choice-check"><input type="checkbox" value="لبني"><span>لبني</span></label>
+          <label class="choice-check"><input type="checkbox" value="بترولي"><span>بترولي</span></label>
+        </div>
+        <input id="customColors" placeholder="ألوان إضافية (مثال: رمادي، بيج)">
+
+        <h3>المقاسات المتاحة</h3>
+        <div id="sizeChoices" class="choice-grid">
+          <label class="choice-check"><input type="checkbox" value="S"><span>S</span></label>
+          <label class="choice-check"><input type="checkbox" value="M" checked><span>M</span></label>
+          <label class="choice-check"><input type="checkbox" value="L" checked><span>L</span></label>
+          <label class="choice-check"><input type="checkbox" value="XL" checked><span>XL</span></label>
+          <label class="choice-check"><input type="checkbox" value="XXL" checked><span>XXL</span></label>
+        </div>
+        <div id="stockEditor" class="stock-editor"></div>
+
+        <h3>صور المنتج</h3>
+        <label>اختَر لون الصور التي سترفعها</label>
+        <select id="imageColorSelect"></select>
+        <input id="productImages" type="file" accept="image/*" multiple>
+        <small class="muted">يمكنك اختيار ورفع أكثر من صورة في المرة الواحدة. كرر العملية لكل لون.</small>
+        <div id="preview" class="upload-preview"></div>
+        <button id="uploadProductImages" type="button" class="btn">رفع الصور المختارة</button>
+        <div class="progress"><i id="uploadBar"></i></div><p id="uploadStatus"></p>
+        <div id="uploadedImagesList" class="uploaded-images-list"></div>
+        <button class="btn" id="saveProduct" type="submit">حفظ المنتج</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">BANNER</p><h2>إدارة البانرات</h2>
+      <input id="bannerFile" type="file" accept="image/*">
+      <div id="bannerPreview" class="banner-preview"></div>
+      <button id="bannerUpload" type="button" class="btn">رفع البانر</button>
+      <div class="progress"><i id="bannerBar"></i></div><p id="bannerStatus"></p>
+      <div id="bannersList" class="manager-list"></div>
+      <hr>
+      <p class="eyebrow">OFFER</p><h2>إضافة عرض</h2>
+      <form id="offerForm"><input name="title" required placeholder="عنوان العرض"><input name="endsAt" type="datetime-local" required><button class="btn">إضافة العرض</button></form>
+    </div>
+
+    <div class="panel admin-span-full">
+      <div class="section-title"><div><p class="eyebrow">CATALOG</p><h2>المنتجات الحالية</h2></div><button id="refreshProducts" class="btn ghost">تحديث</button></div>
+      <div id="productsList" class="manager-grid"></div>
+    </div>
+
+    <div class="panel admin-span-full">
+      <div class="section-title"><div><p class="eyebrow">ORDERS</p><h2>حالة الطلبات</h2></div><button id="refreshOrders" class="btn ghost">تحديث</button></div>
+      <div id="ordersList" class="orders-manager"></div>
+    </div>
+  </section>
+</main>
+<script type="module" src="js/admin.js"></script>
+</body></html>
