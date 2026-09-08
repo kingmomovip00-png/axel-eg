@@ -22,7 +22,7 @@ const upload = multer({
   limits: { fileSize: 15 * 1024 * 1024, files: 20 }
 });
 
-app.use(helmet({ crossOriginResourcePolicy: false }));
+app.use(helmet({ crossOriginResourcePolicy: false, contentSecurityPolicy: false }));
 app.use(morgan("tiny"));
 app.use(cors({
   origin(origin, cb) {

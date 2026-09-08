@@ -1,79 +1,150 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>AXEL | لوحة التحكم</title><link rel="stylesheet" href="css/style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#1d1d1b">
+  <title>AXEL | لوحة التحكم</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-<header class="header admin-header"><div class="container nav"><a class="nav-side" href="index.html">عرض المتجر</a><img src="assets/logo/logo.png" class="brand-logo"><button id="logout" class="btn small-btn">خروج</button></div></header>
-<main class="container admin">
-  <section class="panel admin-welcome"><div><p class="eyebrow">AXEL ADMIN</p><h1>لوحة التحكم</h1><p id="adminEmail" class="muted"></p></div>
-    <div class="stats"><div class="stat">المنتجات<b id="productsCount">0</b></div><div class="stat">الطلبات<b id="ordersCount">0</b></div><div class="stat">إجمالي المبيعات<b id="salesCount">0 ج</b></div></div>
+<body class="admin-page">
+<header class="admin-topbar">
+  <div class="container admin-topbar-inner">
+    <a href="index.html" class="admin-brand" aria-label="العودة إلى المتجر">
+      <img src="assets/logo/logo.png" alt="AXEL">
+    </a>
+    <nav class="admin-nav" aria-label="تنقل لوحة التحكم">
+      <button type="button" class="admin-nav-btn active" data-view="dashboard">الرئيسية</button>
+      <button type="button" class="admin-nav-btn" data-view="product">المنتجات</button>
+      <button type="button" class="admin-nav-btn" data-view="banners">البانرات</button>
+      <button type="button" class="admin-nav-btn" data-view="orders">الطلبات</button>
+    </nav>
+    <div class="admin-user">
+      <span id="adminEmail">...</span>
+      <button id="logout" type="button" class="btn ghost small-btn">تسجيل الخروج</button>
+    </div>
+  </div>
+</header>
+
+<main class="container admin-shell">
+  <div id="globalNotice" class="admin-notice hidden" role="status"></div>
+
+  <section class="admin-view active" data-view-panel="dashboard">
+    <div class="admin-page-heading">
+      <div><p class="eyebrow">AXEL ADMIN</p><h1>لوحة التحكم</h1><p class="muted">إدارة المنتجات والبانرات والطلبات من مكان واحد.</p></div>
+      <button id="dashboardRefresh" type="button" class="btn ghost">تحديث البيانات</button>
+    </div>
+    <div class="admin-stat-grid">
+      <article class="admin-stat-card"><span>المنتجات</span><strong id="productsCount">0</strong></article>
+      <article class="admin-stat-card"><span>الطلبات</span><strong id="ordersCount">0</strong></article>
+      <article class="admin-stat-card"><span>إجمالي المبيعات</span><strong id="salesCount">0 ج</strong></article>
+    </div>
+    <div class="admin-quick-grid">
+      <button type="button" class="admin-quick-card" data-go-view="product"><b>إضافة منتج جديد</b><span>أضف صور متعددة، ألوان، مقاسات وكميات</span></button>
+      <button type="button" class="admin-quick-card" data-go-view="banners"><b>إدارة البانرات</b><span>ارفع، أظهر، أخفِ أو احذف البانرات</span></button>
+      <button type="button" class="admin-quick-card" data-go-view="orders"><b>متابعة الطلبات</b><span>شاهد الطلبات وعدّل حالة الطلب والدفع</span></button>
+    </div>
   </section>
 
-  <section class="admin-grid section">
-    <div class="panel">
-      <div class="section-title"><div><p class="eyebrow">PRODUCT</p><h2 id="productFormTitle">إضافة منتج</h2></div><button id="cancelEdit" type="button" class="btn ghost hidden">إلغاء التعديل</button></div>
-      <form id="productForm">
-        <input name="name" required placeholder="اسم المنتج">
-        <select name="category"><option>تصميمات</option><option>أنمي</option></select>
-        <div class="form-row"><input name="salePrice" value="530" type="number" min="1" placeholder="سعر البيع"><input name="oldPrice" value="650" type="number" min="0" placeholder="السعر القديم"></div>
-        <textarea name="description" placeholder="وصف المنتج">تيشيرت أوفر سايز بخامة مريحة وتصميم مميز.</textarea>
-
-        <h3>الألوان المتاحة</h3>
-        <div id="colorChoices" class="choice-grid">
-          <label class="choice-check"><input type="checkbox" value="أبيض" checked><span>أبيض</span></label>
-          <label class="choice-check"><input type="checkbox" value="أسود"><span>أسود</span></label>
-          <label class="choice-check"><input type="checkbox" value="لبني"><span>لبني</span></label>
-          <label class="choice-check"><input type="checkbox" value="بترولي"><span>بترولي</span></label>
-        </div>
-        <input id="customColors" placeholder="ألوان إضافية (مثال: رمادي، بيج)">
-
-        <h3>المقاسات المتاحة</h3>
-        <div id="sizeChoices" class="choice-grid">
-          <label class="choice-check"><input type="checkbox" value="S"><span>S</span></label>
-          <label class="choice-check"><input type="checkbox" value="M" checked><span>M</span></label>
-          <label class="choice-check"><input type="checkbox" value="L" checked><span>L</span></label>
-          <label class="choice-check"><input type="checkbox" value="XL" checked><span>XL</span></label>
-          <label class="choice-check"><input type="checkbox" value="XXL" checked><span>XXL</span></label>
-        </div>
-        <div id="stockEditor" class="stock-editor"></div>
-
-        <h3>صور المنتج</h3>
-        <label>اختَر لون الصور التي سترفعها</label>
-        <select id="imageColorSelect"></select>
-        <input id="productImages" type="file" accept="image/*" multiple>
-        <small class="muted">يمكنك اختيار ورفع أكثر من صورة في المرة الواحدة. كرر العملية لكل لون.</small>
-        <div id="preview" class="upload-preview"></div>
-        <button id="uploadProductImages" type="button" class="btn">رفع الصور المختارة</button>
-        <div class="progress"><i id="uploadBar"></i></div><p id="uploadStatus"></p>
-        <div id="uploadedImagesList" class="uploaded-images-list"></div>
-        <button class="btn" id="saveProduct" type="submit">حفظ المنتج</button>
-      </form>
+  <section class="admin-view" data-view-panel="product">
+    <div class="admin-page-heading">
+      <div><p class="eyebrow">PRODUCTS</p><h1 id="productFormTitle">إضافة منتج</h1><p class="muted">أكمل البيانات ثم ارفع الصور وبعدها احفظ المنتج.</p></div>
+      <button id="cancelEdit" type="button" class="btn ghost hidden">إلغاء التعديل</button>
     </div>
 
-    <div class="panel">
-      <p class="eyebrow">BANNER</p><h2>إدارة البانرات</h2>
-      <input id="bannerFile" type="file" accept="image/*">
-      <div id="bannerPreview" class="banner-preview"></div>
-      <button id="bannerUpload" type="button" class="btn">رفع البانر</button>
-      <div class="progress"><i id="bannerBar"></i></div><p id="bannerStatus"></p>
-      <div id="bannersList" class="manager-list"></div>
-      <hr>
-      <p class="eyebrow">OFFER</p><h2>إضافة عرض</h2>
-      <form id="offerForm"><input name="title" required placeholder="عنوان العرض"><input name="endsAt" type="datetime-local" required><button class="btn">إضافة العرض</button></form>
+    <div class="admin-two-column">
+      <section class="admin-card">
+        <form id="productForm" novalidate>
+          <div class="admin-form-section">
+            <h2>بيانات المنتج</h2>
+            <label>اسم المنتج<input name="name" required placeholder="مثال: تيشيرت AXEL"></label>
+            <div class="form-row">
+              <label>التصنيف<select name="category"><option value="تصميمات">تصميمات</option><option value="أنمي">أنمي</option></select></label>
+              <label>سعر البيع<input name="salePrice" type="number" min="1" required placeholder="530"></label>
+            </div>
+            <label>السعر القديم <span class="muted">(اختياري)</span><input name="oldPrice" type="number" min="0" placeholder="650"></label>
+            <label>وصف المنتج<textarea name="description" placeholder="اكتب وصف المنتج"></textarea></label>
+          </div>
+
+          <div class="admin-form-section">
+            <h2>الألوان والمقاسات</h2>
+            <p class="admin-field-title">الألوان المتاحة</p>
+            <div id="colorChoices" class="choice-grid">
+              <label class="choice-check"><input type="checkbox" value="أبيض" checked><span>أبيض</span></label>
+              <label class="choice-check"><input type="checkbox" value="أسود"><span>أسود</span></label>
+              <label class="choice-check"><input type="checkbox" value="لبني"><span>لبني</span></label>
+              <label class="choice-check"><input type="checkbox" value="بترولي"><span>بترولي</span></label>
+            </div>
+            <label>ألوان إضافية مفصولة بفاصلة<input id="customColors" placeholder="مثال: رمادي، بيج"></label>
+
+            <p class="admin-field-title">المقاسات المتاحة</p>
+            <div id="sizeChoices" class="choice-grid">
+              <label class="choice-check"><input type="checkbox" value="S"><span>S</span></label>
+              <label class="choice-check"><input type="checkbox" value="M" checked><span>M</span></label>
+              <label class="choice-check"><input type="checkbox" value="L" checked><span>L</span></label>
+              <label class="choice-check"><input type="checkbox" value="XL" checked><span>XL</span></label>
+              <label class="choice-check"><input type="checkbox" value="XXL" checked><span>XXL</span></label>
+            </div>
+            <div id="stockEditor" class="stock-editor"></div>
+          </div>
+
+          <div class="admin-form-section">
+            <h2>صور المنتج</h2>
+            <div class="form-row">
+              <label>لون الصور<select id="imageColorSelect"></select></label>
+              <label>اختيار الصور<input id="productImages" type="file" accept="image/*" multiple></label>
+            </div>
+            <p class="muted">يمكن اختيار ورفع عدة صور في نفس المرة. اختر اللون ثم الصور واضغط رفع الصور.</p>
+            <div id="preview" class="upload-preview"></div>
+            <button id="uploadProductImages" type="button" class="btn">رفع الصور المختارة</button>
+            <div class="progress"><i id="uploadBar"></i></div>
+            <p id="uploadStatus" class="muted"></p>
+            <div id="uploadedImagesList" class="uploaded-images-list"></div>
+          </div>
+
+          <div class="admin-form-actions">
+            <button id="saveProduct" type="submit" class="btn admin-primary">حفظ المنتج</button>
+            <button id="resetProduct" type="button" class="btn ghost">تفريغ النموذج</button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="admin-card admin-catalog-card">
+        <div class="section-title"><div><p class="eyebrow">CATALOG</p><h2>المنتجات الحالية</h2></div><button id="refreshProducts" type="button" class="btn ghost small-btn">تحديث</button></div>
+        <div id="productsList" class="manager-grid"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="admin-view" data-view-panel="banners">
+    <div class="admin-page-heading"><div><p class="eyebrow">BANNERS</p><h1>إدارة البانرات</h1><p class="muted">ارفع بانر جديد ثم أدر ظهوره أو احذفه.</p></div></div>
+    <div class="admin-two-column">
+      <section class="admin-card">
+        <h2>رفع بانر جديد</h2>
+        <label>اختيار صورة البانر<input id="bannerFile" type="file" accept="image/*"></label>
+        <div id="bannerPreview" class="banner-preview"></div>
+        <button id="bannerUpload" type="button" class="btn admin-primary">رفع البانر</button>
+        <div class="progress"><i id="bannerBar"></i></div>
+        <p id="bannerStatus" class="muted"></p>
+      </section>
+      <section class="admin-card">
+        <div class="section-title"><div><h2>البانرات الحالية</h2></div><button id="refreshBanners" type="button" class="btn ghost small-btn">تحديث</button></div>
+        <div id="bannersList" class="manager-list"></div>
+      </section>
     </div>
 
-    <div class="panel admin-span-full">
-      <div class="section-title"><div><p class="eyebrow">CATALOG</p><h2>المنتجات الحالية</h2></div><button id="refreshProducts" class="btn ghost">تحديث</button></div>
-      <div id="productsList" class="manager-grid"></div>
-    </div>
+    <section class="admin-card admin-offer-card">
+      <div><p class="eyebrow">OFFER</p><h2>إضافة عرض</h2></div>
+      <form id="offerForm" class="offer-form"><input name="title" required placeholder="عنوان العرض"><input name="endsAt" type="datetime-local" required><button type="submit" class="btn">إضافة العرض</button></form>
+    </section>
+  </section>
 
-    <div class="panel admin-span-full">
-      <div class="section-title"><div><p class="eyebrow">ORDERS</p><h2>حالة الطلبات</h2></div><button id="refreshOrders" class="btn ghost">تحديث</button></div>
-      <div id="ordersList" class="orders-manager"></div>
-    </div>
+  <section class="admin-view" data-view-panel="orders">
+    <div class="admin-page-heading"><div><p class="eyebrow">ORDERS</p><h1>إدارة الطلبات</h1><p class="muted">تابع حالة كل طلب وعدّل حالة الدفع.</p></div><button id="refreshOrders" type="button" class="btn ghost">تحديث الطلبات</button></div>
+    <section class="admin-card"><div id="ordersList" class="orders-manager"></div></section>
   </section>
 </main>
+
 <script type="module" src="js/admin.js"></script>
-</body></html>
+</body>
+</html>

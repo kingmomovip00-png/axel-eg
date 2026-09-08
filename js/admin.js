@@ -2,220 +2,363 @@ import { auth } from "./firebase.js";
 import { ADMIN_EMAIL, API_URL } from "./config.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 
-const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
-let uploadedProductImages = [];
-let editingProductId = null;
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+const state = { uploadedImages: [], editingProductId: null, products: [], banners: [] };
 
 const els = {
-  adminEmail: $("#adminEmail"), logout: $("#logout"), productForm: $("#productForm"), productFormTitle: $("#productFormTitle"),
-  cancelEdit: $("#cancelEdit"), colorChoices: $("#colorChoices"), sizeChoices: $("#sizeChoices"), customColors: $("#customColors"),
-  stockEditor: $("#stockEditor"), imageColorSelect: $("#imageColorSelect"), productImages: $("#productImages"), preview: $("#preview"),
-  uploadProductImages: $("#uploadProductImages"), uploadBar: $("#uploadBar"), uploadStatus: $("#uploadStatus"), uploadedImagesList: $("#uploadedImagesList"),
-  bannerFile: $("#bannerFile"), bannerPreview: $("#bannerPreview"), bannerUpload: $("#bannerUpload"), bannerBar: $("#bannerBar"), bannerStatus: $("#bannerStatus"),
-  bannerList: $("#bannersList"), offerForm: $("#offerForm"), productsList: $("#productsList"), ordersList: $("#ordersList"),
+  notice: $("#globalNotice"), adminEmail: $("#adminEmail"), logout: $("#logout"),
+  productForm: $("#productForm"), productFormTitle: $("#productFormTitle"), cancelEdit: $("#cancelEdit"), resetProduct: $("#resetProduct"), saveProduct: $("#saveProduct"),
+  colorChoices: $("#colorChoices"), sizeChoices: $("#sizeChoices"), customColors: $("#customColors"), stockEditor: $("#stockEditor"), imageColorSelect: $("#imageColorSelect"), productImages: $("#productImages"), preview: $("#preview"), uploadProductImages: $("#uploadProductImages"), uploadBar: $("#uploadBar"), uploadStatus: $("#uploadStatus"), uploadedImagesList: $("#uploadedImagesList"),
+  productsList: $("#productsList"), refreshProducts: $("#refreshProducts"),
+  bannerFile: $("#bannerFile"), bannerPreview: $("#bannerPreview"), bannerUpload: $("#bannerUpload"), bannerBar: $("#bannerBar"), bannerStatus: $("#bannerStatus"), bannersList: $("#bannersList"), refreshBanners: $("#refreshBanners"),
+  offerForm: $("#offerForm"), ordersList: $("#ordersList"), refreshOrders: $("#refreshOrders"), dashboardRefresh: $("#dashboardRefresh"),
   productsCount: $("#productsCount"), ordersCount: $("#ordersCount"), salesCount: $("#salesCount")
 };
 
-const esc = value => String(value ?? "").replace(/[&<>'\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
-const money = n => new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(Number(n || 0)) + " ج";
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (n) => new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(Number(n || 0)) + " ج";
 
-async function authHeaders(json = false) {
+function notice(message, type = "info") {
+  els.notice.textContent = message;
+  els.notice.className = `admin-notice ${type}`;
+  clearTimeout(notice._timer);
+  notice._timer = setTimeout(() => els.notice.classList.add("hidden"), 4500);
+}
+
+function setBusy(button, busy, busyText = "جاري التنفيذ...") {
+  if (!button) return;
+  if (busy) { button.dataset.originalText = button.textContent; button.disabled = true; button.textContent = busyText; }
+  else { button.disabled = false; button.textContent = button.dataset.originalText || button.textContent; }
+}
+
+async function getAuthHeaders(json = false) {
   const user = auth.currentUser;
   if (!user) throw new Error("يجب تسجيل الدخول أولاً");
-  const headers = { Authorization: `Bearer ${await user.getIdToken()}` };
+  const token = await user.getIdToken();
+  const headers = { Authorization: `Bearer ${token}` };
   if (json) headers["Content-Type"] = "application/json";
   return headers;
 }
 
 async function api(path, options = {}) {
-  const opts = { ...options };
-  if (opts.body && !(opts.body instanceof FormData)) {
-    opts.headers = { ...(opts.headers || {}), ...(await authHeaders(true)) };
-    opts.body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
-  } else {
-    opts.headers = { ...(opts.headers || {}), ...(await authHeaders(false)) };
-  }
-  const r = await fetch(`${API_URL}${path}`, opts);
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok || data.ok === false) throw new Error(data.error || "حدث خطأ");
+  const opts = { method: "GET", ...options };
+  const isForm = opts.body instanceof FormData;
+  opts.headers = { ...(opts.headers || {}), ...(await getAuthHeaders(Boolean(opts.body && !isForm))) };
+  if (opts.body && !isForm && typeof opts.body !== "string") opts.body = JSON.stringify(opts.body);
+  const response = await fetch(`${API_URL}${path}`, opts);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.ok === false) throw new Error(data.error || `فشل الطلب (${response.status})`);
   return data;
 }
 
 function selectedColors() {
-  const checked = $$("#colorChoices input:checked").map(x => x.value.trim());
-  const custom = els.customColors.value.split(/[،,]/).map(x => x.trim()).filter(Boolean);
-  return [...new Set([...checked, ...custom])];
+  const preset = $$("input:checked", els.colorChoices).map((x) => x.value.trim());
+  const custom = (els.customColors.value || "").split(/[،,]/).map((x) => x.trim()).filter(Boolean);
+  return [...new Set([...preset, ...custom])];
 }
-function selectedSizes() { return $$("#sizeChoices input:checked").map(x => x.value); }
+function selectedSizes() { return $$("input:checked", els.sizeChoices).map((x) => x.value); }
 
 function syncProductOptions() {
-  const colors = selectedColors(); const sizes = selectedSizes();
-  els.imageColorSelect.innerHTML = colors.length ? colors.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("") : `<option value="">اختر لوناً أولاً</option>`;
-  const old = new Map($$("#stockEditor input").map(i => [i.name, i.value]));
-  if (!colors.length || !sizes.length) { els.stockEditor.innerHTML = `<p class="muted">اختر لوناً واحداً ومقاساً واحداً على الأقل.</p>`; return; }
-  els.stockEditor.innerHTML = `<h3>الكمية المتاحة لكل مقاس ولون</h3><div class="stock-table">${colors.map(c => `<div class="stock-row"><b>${esc(c)}</b>${sizes.map(s => { const key = `${c}__${s}`; return `<label>${s}<input type="number" min="0" value="${old.get(key) ?? 0}" name="${esc(key)}"></label>`; }).join("")}</div>`).join("")}</div>`;
+  const colors = selectedColors();
+  const sizes = selectedSizes();
+  const oldValues = new Map($$("input[data-stock-key]", els.stockEditor).map((input) => [input.dataset.stockKey, input.value]));
+  els.imageColorSelect.innerHTML = colors.length
+    ? colors.map((color) => `<option value="${esc(color)}">${esc(color)}</option>`).join("")
+    : `<option value="">اختر لوناً أولاً</option>`;
+  if (!colors.length || !sizes.length) {
+    els.stockEditor.innerHTML = `<p class="muted">اختر لوناً ومقاساً واحداً على الأقل لتحديد الكمية.</p>`;
+    return;
+  }
+  els.stockEditor.innerHTML = `<h3>الكمية المتاحة لكل لون ومقاس</h3><div class="stock-table">${colors.map((color) => {
+    const cells = sizes.map((size) => {
+      const key = `${color}||${size}`;
+      return `<label>${esc(size)}<input type="number" min="0" value="${esc(oldValues.get(key) ?? 0)}" data-stock-key="${esc(key)}"></label>`;
+    }).join("");
+    return `<div class="stock-row"><b>${esc(color)}</b>${cells}</div>`;
+  }).join("")}</div>`;
 }
 
 function stockFromEditor() {
-  const stock = {}; const colors = selectedColors(); const sizes = selectedSizes();
-  colors.forEach(c => { stock[c] = {}; sizes.forEach(s => { const input = els.stockEditor.querySelector(`[name="${CSS.escape(`${c}__${s}`)}"]`); stock[c][s] = Math.max(0, Number(input?.value || 0)); }); });
+  const stock = {};
+  $$("input[data-stock-key]", els.stockEditor).forEach((input) => {
+    const [color, size] = input.dataset.stockKey.split("||");
+    stock[color] ||= {};
+    stock[color][size] = Math.max(0, Number(input.value || 0));
+  });
   return stock;
 }
 
+function previewFiles(input, target) {
+  target.innerHTML = "";
+  Array.from(input.files || []).forEach((file) => {
+    const url = URL.createObjectURL(file);
+    const img = document.createElement("img");
+    img.src = url; img.alt = file.name;
+    img.onload = () => URL.revokeObjectURL(url);
+    target.appendChild(img);
+  });
+}
+
 async function uploadFiles(files, folder) {
-  const fd = new FormData(); [...files].forEach(file => fd.append("files", file)); fd.append("folder", folder);
-  const r = await fetch(`${API_URL}/upload`, { method: "POST", headers: await authHeaders(), body: fd });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok || !data.ok) throw new Error(data.error || "فشل الرفع");
-  return data.files;
+  const fd = new FormData();
+  Array.from(files).forEach((file) => fd.append("files", file));
+  fd.append("folder", folder);
+  const response = await fetch(`${API_URL}/upload`, { method: "POST", headers: await getAuthHeaders(), body: fd });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.ok) throw new Error(data.error || "فشل رفع الصور");
+  return data.files || [];
 }
 
 function renderUploadedImages() {
-  els.uploadedImagesList.innerHTML = uploadedProductImages.map((img, i) => `<div class="uploaded-image"><img src="${esc(img.url)}"><span>${esc(img.color)}</span><button type="button" data-remove-image="${i}">×</button></div>`).join("");
+  els.uploadedImagesList.innerHTML = state.uploadedImages.map((image, index) => `
+    <article class="uploaded-image">
+      <img src="${esc(image.url)}" alt="صورة المنتج">
+      <span>${esc(image.color)}</span>
+      <button type="button" data-remove-image="${index}" aria-label="حذف الصورة">×</button>
+    </article>`).join("") || `<p class="muted">لم يتم رفع صور للمنتج بعد.</p>`;
 }
 
+function resetProductForm() {
+  state.editingProductId = null;
+  state.uploadedImages = [];
+  els.productForm.reset();
+  $$("input", els.colorChoices).forEach((input) => input.checked = input.value === "أبيض");
+  $$("input", els.sizeChoices).forEach((input) => input.checked = ["M", "L", "XL", "XXL"].includes(input.value));
+  els.customColors.value = "";
+  els.preview.innerHTML = "";
+  els.productImages.value = "";
+  els.uploadBar.style.width = "0";
+  els.uploadStatus.textContent = "";
+  els.productFormTitle.textContent = "إضافة منتج";
+  els.cancelEdit.classList.add("hidden");
+  els.saveProduct.textContent = "حفظ المنتج";
+  syncProductOptions();
+  renderUploadedImages();
+}
+
+async function loadProducts() {
+  els.productsList.innerHTML = `<p class="muted">جاري تحميل المنتجات...</p>`;
+  try {
+    const { products = [] } = await api("/admin/products");
+    state.products = products;
+    els.productsList.innerHTML = products.map((product) => `
+      <article class="manager-card">
+        <img src="${esc(product.images?.[0]?.url || "")}" alt="${esc(product.name)}">
+        <div><b>${esc(product.name)}</b><p>${money(product.salePrice)} ${product.active === false ? "• مخفي" : "• ظاهر"}</p><small>${esc((product.colors || []).join(" • "))}</small></div>
+        <div class="manager-actions">
+          <button type="button" class="btn ghost small-btn" data-edit-product="${esc(product.id)}">تعديل / استبدال</button>
+          <button type="button" class="btn danger small-btn" data-delete-product="${esc(product.id)}">حذف</button>
+        </div>
+      </article>`).join("") || `<p class="muted">لا توجد منتجات حتى الآن.</p>`;
+  } catch (error) {
+    els.productsList.innerHTML = `<p class="admin-error">${esc(error.message)}</p>`;
+    notice(error.message, "error");
+  }
+}
+
+function editProduct(product) {
+  if (!product) return;
+  state.editingProductId = product.id;
+  state.uploadedImages = Array.isArray(product.images) ? product.images.map((image) => ({ ...image })) : [];
+  els.productForm.elements.name.value = product.name || "";
+  els.productForm.elements.category.value = product.category || "تصميمات";
+  els.productForm.elements.salePrice.value = product.salePrice ?? "";
+  els.productForm.elements.oldPrice.value = product.oldPrice ?? "";
+  els.productForm.elements.description.value = product.description || "";
+  const preset = $$("input", els.colorChoices).map((input) => input.value);
+  $$("input", els.colorChoices).forEach((input) => input.checked = (product.colors || []).includes(input.value));
+  els.customColors.value = (product.colors || []).filter((color) => !preset.includes(color)).join("، ");
+  $$("input", els.sizeChoices).forEach((input) => input.checked = (product.sizes || []).includes(input.value));
+  syncProductOptions();
+  Object.entries(product.stock || {}).forEach(([color, sizes]) => Object.entries(sizes || {}).forEach(([size, quantity]) => {
+    const key = `${color}||${size}`;
+    const input = $$("input[data-stock-key]", els.stockEditor).find((item) => item.dataset.stockKey === key);
+    if (input) input.value = quantity;
+  }));
+  renderUploadedImages();
+  els.productFormTitle.textContent = `تعديل: ${product.name}`;
+  els.cancelEdit.classList.remove("hidden");
+  els.saveProduct.textContent = "حفظ التعديلات";
+  showView("product");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function saveProduct(event) {
+  event.preventDefault();
+  const form = new FormData(els.productForm);
+  const colors = selectedColors();
+  const sizes = selectedSizes();
+  const name = String(form.get("name") || "").trim();
+  const salePrice = Number(form.get("salePrice") || 0);
+  if (!name || salePrice <= 0) return notice("اكتب اسم المنتج وسعر البيع بشكل صحيح.", "error");
+  if (!colors.length || !sizes.length) return notice("اختر لوناً ومقاساً واحداً على الأقل.", "error");
+  if (!state.uploadedImages.length) return notice("ارفع صورة واحدة على الأقل قبل حفظ المنتج.", "error");
+  const payload = {
+    name, category: form.get("category"), salePrice,
+    oldPrice: Number(form.get("oldPrice") || 0), description: String(form.get("description") || ""),
+    colors, sizes, stock: stockFromEditor(), images: state.uploadedImages
+  };
+  try {
+    setBusy(els.saveProduct, true, state.editingProductId ? "جاري حفظ التعديلات..." : "جاري حفظ المنتج...");
+    if (state.editingProductId) await api(`/admin/products/${encodeURIComponent(state.editingProductId)}`, { method: "PATCH", body: payload });
+    else await api("/admin/products", { method: "POST", body: payload });
+    notice(state.editingProductId ? "تم تعديل المنتج بنجاح." : "تم حفظ المنتج وظهوره في المتجر.", "success");
+    resetProductForm();
+    await Promise.all([loadProducts(), loadStats()]);
+  } catch (error) { notice(error.message || "فشل حفظ المنتج.", "error"); }
+  finally { setBusy(els.saveProduct, false); }
+}
+
+async function loadBanners() {
+  els.bannersList.innerHTML = `<p class="muted">جاري تحميل البانرات...</p>`;
+  try {
+    const { banners = [] } = await api("/admin/banners");
+    state.banners = banners;
+    els.bannersList.innerHTML = banners.map((banner) => `
+      <article class="banner-manager-item">
+        <img src="${esc(banner.imageUrl)}" alt="بانر">
+        <div><b>${banner.active === false ? "مخفي" : "ظاهر"}</b><div class="manager-actions">
+          <button type="button" class="btn ghost small-btn" data-toggle-banner="${esc(banner.id)}" data-active="${banner.active !== false}">${banner.active === false ? "إظهار" : "إخفاء"}</button>
+          <button type="button" class="btn danger small-btn" data-delete-banner="${esc(banner.id)}">حذف</button>
+        </div></div>
+      </article>`).join("") || `<p class="muted">لا توجد بانرات مرفوعة.</p>`;
+  } catch (error) { els.bannersList.innerHTML = `<p class="admin-error">${esc(error.message)}</p>`; notice(error.message, "error"); }
+}
+
+async function loadOrders() {
+  els.ordersList.innerHTML = `<p class="muted">جاري تحميل الطلبات...</p>`;
+  try {
+    const { orders = [] } = await api("/admin/orders");
+    const statuses = ["جديد", "قيد التجهيز", "تم الشحن", "تم التوصيل", "ملغي", "مرتجع"];
+    const payments = ["pending", "paid", "failed", "refunded"];
+    els.ordersList.innerHTML = orders.map((order) => `
+      <article class="order-card">
+        <div class="order-main">
+          <b>${esc(order.orderCode || order.id)}</b><span>${esc(order.customerName || "")}</span><span>${esc(order.phone || "")}</span>
+          <span>${esc(order.productName || "")} • ${esc(order.color || "")} • ${esc(order.size || "")} × ${Number(order.quantity || 1)}</span><strong>${money(order.total)}</strong>
+        </div>
+        <div class="order-controls">
+          <label>حالة الطلب<select data-order-status="${esc(order.id)}">${statuses.map((status) => `<option value="${esc(status)}" ${status === order.status ? "selected" : ""}>${esc(status)}</option>`).join("")}</select></label>
+          <label>حالة الدفع<select data-payment-status="${esc(order.id)}">${payments.map((status) => `<option value="${esc(status)}" ${status === order.paymentStatus ? "selected" : ""}>${esc(status)}</option>`).join("")}</select></label>
+          <button type="button" class="btn small-btn" data-save-order="${esc(order.id)}">حفظ الحالة</button>
+        </div>
+      </article>`).join("") || `<p class="muted">لا توجد طلبات حتى الآن.</p>`;
+  } catch (error) { els.ordersList.innerHTML = `<p class="admin-error">${esc(error.message)}</p>`; notice(error.message, "error"); }
+}
+
+async function loadStats() {
+  try {
+    const { stats } = await api("/admin/stats");
+    els.productsCount.textContent = stats.products ?? 0;
+    els.ordersCount.textContent = stats.orders ?? 0;
+    els.salesCount.textContent = money(stats.sales ?? 0);
+  } catch (error) { console.warn("Stats error", error); }
+}
+
+function showView(name) {
+  $$("[data-view-panel]").forEach((panel) => panel.classList.toggle("active", panel.dataset.viewPanel === name));
+  $$(".admin-nav-btn").forEach((button) => button.classList.toggle("active", button.dataset.view === name));
+}
+
+// Navigation
+$$(".admin-nav-btn").forEach((button) => button.addEventListener("click", () => showView(button.dataset.view)));
+$$("[data-go-view]").forEach((button) => button.addEventListener("click", () => showView(button.dataset.goView)));
+
+// Product options and uploads
 els.colorChoices.addEventListener("change", syncProductOptions);
 els.sizeChoices.addEventListener("change", syncProductOptions);
 els.customColors.addEventListener("input", syncProductOptions);
-
-els.productImages.onchange = () => {
-  els.preview.innerHTML = [...els.productImages.files].map(f => `<img src="${URL.createObjectURL(f)}" alt="preview">`).join("");
-};
-
-els.uploadProductImages.onclick = async () => {
+els.productImages.addEventListener("change", () => previewFiles(els.productImages, els.preview));
+els.uploadProductImages.addEventListener("click", async () => {
   const color = els.imageColorSelect.value;
-  if (!color) return alert("اختر لون المنتج أولاً");
-  if (!els.productImages.files.length) return alert("اختر صورة واحدة أو أكثر أولاً");
+  const files = Array.from(els.productImages.files || []);
+  if (!color) return notice("اختر لون الصور أولاً.", "error");
+  if (!files.length) return notice("اختر صورة واحدة أو أكثر أولاً.", "error");
   try {
-    els.uploadProductImages.disabled = true; els.uploadBar.style.width = "25%"; els.uploadStatus.textContent = "جاري رفع الصور...";
-    const files = await uploadFiles(els.productImages.files, "/axel/products");
-    uploadedProductImages.push(...files.map(x => ({ color, url: x.url, fileId: x.fileId })));
-    els.uploadBar.style.width = "100%"; els.uploadStatus.textContent = `تم رفع ${files.length} صورة للون ${color}`;
-    els.productImages.value = ""; els.preview.innerHTML = ""; renderUploadedImages();
-  } catch (e) { els.uploadBar.style.width = "0"; els.uploadStatus.textContent = e.message || "فشل رفع الصور"; }
-  finally { els.uploadProductImages.disabled = false; }
-};
-
-els.uploadedImagesList.onclick = async e => {
-  const btn = e.target.closest("[data-remove-image]"); if (!btn) return;
-  const index = Number(btn.dataset.removeImage); const image = uploadedProductImages[index];
+    setBusy(els.uploadProductImages, true, "جاري رفع الصور...");
+    els.uploadBar.style.width = "30%"; els.uploadStatus.textContent = "جاري إرسال الصور...";
+    const uploaded = await uploadFiles(files, "/axel/products");
+    els.uploadBar.style.width = "100%";
+    state.uploadedImages.push(...uploaded.map((file) => ({ color, url: file.url, fileId: file.fileId })));
+    els.productImages.value = ""; els.preview.innerHTML = "";
+    els.uploadStatus.textContent = `تم رفع ${uploaded.length} صورة للون ${color}.`;
+    renderUploadedImages(); notice("تم رفع الصور بنجاح.", "success");
+  } catch (error) { els.uploadBar.style.width = "0"; els.uploadStatus.textContent = error.message; notice(error.message, "error"); }
+  finally { setBusy(els.uploadProductImages, false); }
+});
+els.uploadedImagesList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-remove-image]");
+  if (!button) return;
+  const index = Number(button.dataset.removeImage); const image = state.uploadedImages[index];
   if (!confirm("حذف هذه الصورة من المنتج؟")) return;
-  uploadedProductImages.splice(index, 1); renderUploadedImages();
+  state.uploadedImages.splice(index, 1); renderUploadedImages();
   if (image?.fileId) api(`/upload/${encodeURIComponent(image.fileId)}`, { method: "DELETE" }).catch(() => {});
-};
-
-els.productForm.onsubmit = async e => {
-  e.preventDefault();
-  const f = new FormData(els.productForm); const colors = selectedColors(); const sizes = selectedSizes();
-  if (!colors.length || !sizes.length) return alert("اختر الألوان والمقاسات");
-  if (!uploadedProductImages.length) return alert("ارفع صورة واحدة على الأقل للمنتج");
-  const payload = { name: f.get("name"), category: f.get("category"), salePrice: Number(f.get("salePrice")), oldPrice: Number(f.get("oldPrice")), description: f.get("description"), colors, sizes, stock: stockFromEditor(), images: uploadedProductImages };
-  try {
-    const button = $("#saveProduct"); button.disabled = true; button.textContent = "جاري الحفظ...";
-    if (editingProductId) await api(`/admin/products/${editingProductId}`, { method: "PATCH", body: payload });
-    else await api("/admin/products", { method: "POST", body: payload });
-    alert(editingProductId ? "تم تعديل المنتج" : "تم حفظ المنتج وظهوره في المتجر");
-    resetProductForm(); await loadStats(); await loadProducts();
-  } catch (err) { alert(err.message || "فشل حفظ المنتج"); }
-  finally { const button = $("#saveProduct"); button.disabled = false; button.textContent = editingProductId ? "حفظ التعديلات" : "حفظ المنتج"; }
-};
-
-function resetProductForm() {
-  editingProductId = null; uploadedProductImages = []; els.productForm.reset();
-  $$("#colorChoices input").forEach(x => x.checked = x.value === "أبيض");
-  $$("#sizeChoices input").forEach(x => x.checked = ["M","L","XL","XXL"].includes(x.value));
-  els.customColors.value = ""; els.preview.innerHTML = ""; els.uploadedImagesList.innerHTML = ""; els.uploadStatus.textContent = ""; els.uploadBar.style.width = "0";
-  els.productFormTitle.textContent = "إضافة منتج"; els.cancelEdit.classList.add("hidden"); $("#saveProduct").textContent = "حفظ المنتج"; syncProductOptions();
-}
-els.cancelEdit.onclick = resetProductForm;
-
-els.bannerFile.onchange = () => {
-  const file = els.bannerFile.files[0]; els.bannerPreview.innerHTML = file ? `<img src="${URL.createObjectURL(file)}" alt="banner preview">` : "";
-};
-els.bannerUpload.onclick = async () => {
-  if (!els.bannerFile.files[0]) return alert("اختر صورة البانر أولاً");
-  try {
-    els.bannerUpload.disabled = true; els.bannerBar.style.width = "30%"; els.bannerStatus.textContent = "جاري رفع البانر...";
-    const [file] = await uploadFiles([els.bannerFile.files[0]], "/axel/banners");
-    els.bannerBar.style.width = "75%"; await api("/admin/banners", { method: "POST", body: { imageUrl: file.url, fileId: file.fileId } });
-    els.bannerBar.style.width = "100%"; els.bannerStatus.textContent = "تم رفع البانر وسيظهر في الصفحة الرئيسية"; els.bannerFile.value = ""; els.bannerPreview.innerHTML = ""; await loadBanners();
-  } catch (e) { els.bannerBar.style.width = "0"; els.bannerStatus.textContent = e.message || "فشل رفع البانر"; }
-  finally { els.bannerUpload.disabled = false; }
-};
-
-els.offerForm.onsubmit = async e => {
-  e.preventDefault(); const f = new FormData(els.offerForm);
-  try { await api("/admin/offers", { method: "POST", body: { title: f.get("title"), endsAt: f.get("endsAt") } }); els.offerForm.reset(); alert("تمت إضافة العرض"); }
-  catch (err) { alert(err.message); }
-};
-
-async function loadProducts() {
-  try {
-    const { products } = await api("/admin/products");
-    els.productsList.innerHTML = products.map(p => `<article class="manager-card"><img src="${esc(p.images?.[0]?.url || "")}" alt=""><div><b>${esc(p.name)}</b><p>${money(p.salePrice)} ${p.active === false ? "• مخفي" : "• ظاهر"}</p><small>${esc((p.colors || []).join(" • "))} | ${esc((p.sizes || []).join(" • "))}</small></div><div class="manager-actions"><button class="btn ghost" data-edit-product="${p.id}">تعديل / استبدال</button><button class="btn danger" data-delete-product="${p.id}">حذف</button></div></article>`).join("") || `<p class="muted">لا توجد منتجات بعد.</p>`;
-    els.productsList._data = products;
-  } catch (e) { els.productsList.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-}
-
-els.productsList.onclick = async e => {
-  const edit = e.target.closest("[data-edit-product]"); const del = e.target.closest("[data-delete-product]");
-  if (edit) {
-    const p = (els.productsList._data || []).find(x => x.id === edit.dataset.editProduct); if (!p) return;
-    editingProductId = p.id; uploadedProductImages = [...(p.images || [])];
-    els.productForm.elements.name.value = p.name || ""; els.productForm.elements.category.value = p.category || "تصميمات"; els.productForm.elements.salePrice.value = p.salePrice || ""; els.productForm.elements.oldPrice.value = p.oldPrice || ""; els.productForm.elements.description.value = p.description || "";
-    $$("#colorChoices input").forEach(x => x.checked = (p.colors || []).includes(x.value));
-    const knownColors = $$("#colorChoices input").map(x => x.value); els.customColors.value = (p.colors || []).filter(c => !knownColors.includes(c)).join("، ");
-    $$("#sizeChoices input").forEach(x => x.checked = (p.sizes || []).includes(x.value)); syncProductOptions();
-    Object.entries(p.stock || {}).forEach(([c, sizes]) => Object.entries(sizes || {}).forEach(([s, qty]) => { const input = els.stockEditor.querySelector(`[name="${CSS.escape(`${c}__${s}`)}"]`); if (input) input.value = qty; }));
-    renderUploadedImages(); els.productFormTitle.textContent = `تعديل: ${p.name}`; els.cancelEdit.classList.remove("hidden"); $("#saveProduct").textContent = "حفظ التعديلات"; window.scrollTo({ top: 0, behavior: "smooth" });
+});
+els.productForm.addEventListener("submit", saveProduct);
+els.resetProduct.addEventListener("click", resetProductForm);
+els.cancelEdit.addEventListener("click", resetProductForm);
+els.refreshProducts.addEventListener("click", loadProducts);
+els.productsList.addEventListener("click", async (event) => {
+  const editButton = event.target.closest("[data-edit-product]");
+  const deleteButton = event.target.closest("[data-delete-product]");
+  if (editButton) return editProduct(state.products.find((product) => product.id === editButton.dataset.editProduct));
+  if (deleteButton) {
+    if (!confirm("متأكد من حذف المنتج نهائياً؟")) return;
+    try { setBusy(deleteButton, true, "جاري الحذف..."); await api(`/admin/products/${encodeURIComponent(deleteButton.dataset.deleteProduct)}`, { method: "DELETE" }); notice("تم حذف المنتج.", "success"); await Promise.all([loadProducts(), loadStats()]); }
+    catch (error) { notice(error.message, "error"); } finally { setBusy(deleteButton, false); }
   }
-  if (del) {
-    if (!confirm("متأكد أنك تريد حذف المنتج نهائياً؟")) return;
-    try { await api(`/admin/products/${del.dataset.deleteProduct}`, { method: "DELETE" }); await loadProducts(); await loadStats(); }
-    catch (err) { alert(err.message); }
-  }
-};
+});
 
-async function loadBanners() {
+// Banners
+els.bannerFile.addEventListener("change", () => previewFiles(els.bannerFile, els.bannerPreview));
+els.bannerUpload.addEventListener("click", async () => {
+  const file = els.bannerFile.files?.[0];
+  if (!file) return notice("اختر صورة البانر أولاً.", "error");
   try {
-    const { banners } = await api("/admin/banners");
-    els.bannerList.innerHTML = banners.map(b => `<article class="banner-manager-item"><img src="${esc(b.imageUrl)}"><div><b>${b.active === false ? "مخفي" : "ظاهر"}</b><div class="manager-actions"><button class="btn ghost" data-toggle-banner="${b.id}" data-active="${b.active !== false}">${b.active === false ? "إظهار" : "إخفاء"}</button><button class="btn danger" data-delete-banner="${b.id}">حذف</button></div></div></article>`).join("") || `<p class="muted">لا يوجد بانر مرفوع.</p>`;
-  } catch (e) { els.bannerList.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-}
-els.bannerList.onclick = async e => {
-  const toggle = e.target.closest("[data-toggle-banner]"); const del = e.target.closest("[data-delete-banner]");
+    setBusy(els.bannerUpload, true, "جاري رفع البانر...");
+    els.bannerBar.style.width = "35%"; els.bannerStatus.textContent = "جاري رفع الصورة...";
+    const [uploaded] = await uploadFiles([file], "/axel/banners");
+    els.bannerBar.style.width = "75%";
+    await api("/admin/banners", { method: "POST", body: { imageUrl: uploaded.url, fileId: uploaded.fileId } });
+    els.bannerBar.style.width = "100%"; els.bannerStatus.textContent = "تم رفع البانر بنجاح.";
+    els.bannerFile.value = ""; els.bannerPreview.innerHTML = "";
+    await loadBanners(); notice("تمت إضافة البانر وسيظهر في الصفحة الرئيسية.", "success");
+  } catch (error) { els.bannerBar.style.width = "0"; els.bannerStatus.textContent = error.message; notice(error.message, "error"); }
+  finally { setBusy(els.bannerUpload, false); }
+});
+els.refreshBanners.addEventListener("click", loadBanners);
+els.bannersList.addEventListener("click", async (event) => {
+  const toggle = event.target.closest("[data-toggle-banner]"); const remove = event.target.closest("[data-delete-banner]");
   try {
-    if (toggle) await api(`/admin/banners/${toggle.dataset.toggleBanner}`, { method: "PATCH", body: { active: toggle.dataset.active !== "true" } });
-    if (del && confirm("حذف البانر؟")) await api(`/admin/banners/${del.dataset.deleteBanner}`, { method: "DELETE" });
-    await loadBanners();
-  } catch (err) { alert(err.message); }
-};
+    if (toggle) await api(`/admin/banners/${encodeURIComponent(toggle.dataset.toggleBanner)}`, { method: "PATCH", body: { active: toggle.dataset.active !== "true" } });
+    if (remove) { if (!confirm("حذف البانر؟")) return; await api(`/admin/banners/${encodeURIComponent(remove.dataset.deleteBanner)}`, { method: "DELETE" }); }
+    await loadBanners(); notice("تم تحديث البانرات.", "success");
+  } catch (error) { notice(error.message, "error"); }
+});
+els.offerForm.addEventListener("submit", async (event) => {
+  event.preventDefault(); const form = new FormData(els.offerForm);
+  try { await api("/admin/offers", { method: "POST", body: { title: form.get("title"), endsAt: form.get("endsAt") } }); els.offerForm.reset(); notice("تمت إضافة العرض.", "success"); }
+  catch (error) { notice(error.message, "error"); }
+});
 
-const statusOptions = ["جديد", "قيد التجهيز", "تم الشحن", "تم التوصيل", "ملغي", "مرتجع"];
-const paymentOptions = ["pending", "paid", "failed", "refunded"];
-async function loadOrders() {
-  try {
-    const { orders } = await api("/admin/orders");
-    els.ordersList.innerHTML = orders.map(o => `<article class="order-card"><div class="order-main"><b>${esc(o.orderCode || o.id)}</b><span>${esc(o.customerName || "")}</span><span>${esc(o.phone || "")}</span><span>${esc(o.productName || "")} • ${esc(o.color || "")} • ${esc(o.size || "")} × ${Number(o.quantity || 1)}</span><strong>${money(o.total)}</strong></div><div class="order-controls"><label>حالة الطلب<select data-order-status="${o.id}">${statusOptions.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>حالة الدفع<select data-payment-status="${o.id}">${paymentOptions.map(s => `<option ${s === o.paymentStatus ? "selected" : ""}>${s}</option>`).join("")}</select></label><button class="btn" data-save-order="${o.id}">حفظ الحالة</button></div></article>`).join("") || `<p class="muted">لا توجد طلبات حتى الآن.</p>`;
-  } catch (e) { els.ordersList.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
-}
-els.ordersList.onclick = async e => {
-  const btn = e.target.closest("[data-save-order]"); if (!btn) return;
-  const id = btn.dataset.saveOrder;
-  try { btn.disabled = true; await api(`/admin/orders/${id}`, { method: "PATCH", body: { status: els.ordersList.querySelector(`[data-order-status="${id}"]`).value, paymentStatus: els.ordersList.querySelector(`[data-payment-status="${id}"]`).value } }); btn.textContent = "تم الحفظ ✓"; setTimeout(() => btn.textContent = "حفظ الحالة", 1200); }
-  catch (err) { alert(err.message); } finally { btn.disabled = false; }
-};
+// Orders
+els.refreshOrders.addEventListener("click", loadOrders);
+els.ordersList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-save-order]"); if (!button) return;
+  const id = button.dataset.saveOrder;
+  const status = els.ordersList.querySelector(`[data-order-status="${CSS.escape(id)}"]`)?.value;
+  const paymentStatus = els.ordersList.querySelector(`[data-payment-status="${CSS.escape(id)}"]`)?.value;
+  try { setBusy(button, true, "جاري الحفظ..."); await api(`/admin/orders/${encodeURIComponent(id)}`, { method: "PATCH", body: { status, paymentStatus } }); notice("تم تحديث حالة الطلب.", "success"); await loadStats(); }
+  catch (error) { notice(error.message, "error"); } finally { setBusy(button, false); }
+});
 
-async function loadStats() {
-  try { const { stats } = await api("/admin/stats"); els.productsCount.textContent = stats.products; els.ordersCount.textContent = stats.orders; els.salesCount.textContent = money(stats.sales); } catch (_) {}
-}
+els.dashboardRefresh.addEventListener("click", async () => { setBusy(els.dashboardRefresh, true, "جاري التحديث..."); await Promise.all([loadStats(), loadProducts(), loadOrders(), loadBanners()]); setBusy(els.dashboardRefresh, false); notice("تم تحديث البيانات.", "success"); });
+els.logout.addEventListener("click", () => signOut(auth));
 
-$("#refreshProducts").onclick = loadProducts; $("#refreshOrders").onclick = loadOrders;
-els.logout.onclick = () => signOut(auth);
-
-onAuthStateChanged(auth, async user => {
-  if (!user || (user.email || "").toLowerCase() !== ADMIN_EMAIL) { location.href = "login.html"; return; }
-  els.adminEmail.textContent = user.email; syncProductOptions(); renderUploadedImages();
+onAuthStateChanged(auth, async (user) => {
+  if (!user || (user.email || "").toLowerCase() !== ADMIN_EMAIL.toLowerCase()) { location.href = "login.html"; return; }
+  els.adminEmail.textContent = user.email;
+  syncProductOptions(); renderUploadedImages();
   await Promise.all([loadStats(), loadProducts(), loadOrders(), loadBanners()]);
 });
