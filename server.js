@@ -282,14 +282,24 @@ app.delete("/api/admin/products/:id", requireAdmin, async (req, res) => {
 });
 
 app.get("/api/admin/banners", requireAdmin, async (req, res) => {
-  const snap = await db.collection("banners").get();
-  res.json({ ok: true, banners: snap.docs.map(serializeDoc) });
+  try {
+    const snap = await db.collection("banners").get();
+    res.json({ ok: true, banners: snap.docs.map(serializeDoc) });
+  } catch (error) {
+    console.error("Load banners error:", error.message);
+    res.status(500).json({ ok: false, error: "تعذر تحميل البانرات من قاعدة البيانات." });
+  }
 });
 app.post("/api/admin/banners", requireAdmin, async (req, res) => {
-  const { imageUrl, fileId } = req.body || {};
-  if (!imageUrl) return res.status(400).json({ ok: false, error: "ارفع البانر أولاً" });
-  const ref = await db.collection("banners").add({ imageUrl, fileId: fileId || "", active: true, createdAt: admin.firestore.FieldValue.serverTimestamp() });
-  res.status(201).json({ ok: true, id: ref.id });
+  try {
+    const { imageUrl, fileId } = req.body || {};
+    if (!imageUrl) return res.status(400).json({ ok: false, error: "ارفع البانر أولاً." });
+    const ref = await db.collection("banners").add({ imageUrl, fileId: fileId || "", active: true, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    res.status(201).json({ ok: true, id: ref.id });
+  } catch (error) {
+    console.error("Save banner error:", error.message);
+    res.status(500).json({ ok: false, error: "فشل حفظ البانر في قاعدة البيانات. راجع إعداد FIREBASE_SERVICE_ACCOUNT_BASE64 في الخادم." });
+  }
 });
 app.patch("/api/admin/banners/:id", requireAdmin, async (req, res) => {
   await db.collection("banners").doc(req.params.id).update({ active: req.body?.active !== false });

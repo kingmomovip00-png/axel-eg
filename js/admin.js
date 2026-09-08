@@ -35,7 +35,7 @@ function setBusy(button, busy, busyText = "جاري التنفيذ...") {
 async function getAuthHeaders(json = false) {
   const user = auth.currentUser;
   if (!user) throw new Error("يجب تسجيل الدخول أولاً");
-  const token = await user.getIdToken();
+  const token = await user.getIdToken(true);
   const headers = { Authorization: `Bearer ${token}` };
   if (json) headers["Content-Type"] = "application/json";
   return headers;
@@ -46,9 +46,20 @@ async function api(path, options = {}) {
   const isForm = opts.body instanceof FormData;
   opts.headers = { ...(opts.headers || {}), ...(await getAuthHeaders(Boolean(opts.body && !isForm))) };
   if (opts.body && !isForm && typeof opts.body !== "string") opts.body = JSON.stringify(opts.body);
-  const response = await fetch(`${API_URL}${path}`, opts);
+  let response;
+  try {
+    response = await fetch(`${API_URL}${path}`, opts);
+  } catch (networkError) {
+    throw new Error("تعذر الاتصال بالخادم. تأكد من أن التطبيق يعمل ثم أعد المحاولة.");
+  }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.ok === false) throw new Error(data.error || `فشل الطلب (${response.status})`);
+  if (!response.ok || data.ok === false) {
+    const statusMessage = response.status === 401 ? "انتهت جلسة تسجيل الدخول. سجّل الدخول مرة أخرى."
+      : response.status === 403 ? "ليس لديك صلاحية لتنفيذ هذه العملية."
+      : response.status === 413 ? "حجم الصورة كبير جداً."
+      : "";
+    throw new Error(data.error || statusMessage || `فشل الطلب (${response.status})`);
+  }
   return data;
 }
 
@@ -104,10 +115,18 @@ async function uploadFiles(files, folder) {
   const fd = new FormData();
   Array.from(files).forEach((file) => fd.append("files", file));
   fd.append("folder", folder);
-  const response = await fetch(`${API_URL}/upload`, { method: "POST", headers: await getAuthHeaders(), body: fd });
+  let response;
+  try {
+    response = await fetch(`${API_URL}/upload`, { method: "POST", headers: await getAuthHeaders(), body: fd });
+  } catch {
+    throw new Error("تعذر الاتصال بخدمة رفع الصور. تأكد من أن الخادم يعمل.");
+  }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || !data.ok) throw new Error(data.error || "فشل رفع الصور");
-  return data.files || [];
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || (response.status === 401 ? "انتهت جلسة الدخول. أعد تسجيل الدخول." : response.status === 403 ? "ليس لديك صلاحية لرفع الصور." : "فشل رفع الصور"));
+  }
+  if (!Array.isArray(data.files) || !data.files.length) throw new Error("لم يستقبل الخادم أي رابط للصورة بعد الرفع.");
+  return data.files;
 }
 
 function renderUploadedImages() {
