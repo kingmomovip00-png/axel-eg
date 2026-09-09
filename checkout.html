@@ -22,13 +22,30 @@
     <input id="email" required type="email" autocomplete="email" placeholder="example@email.com">
     <label for="address">العنوان بالتفصيل</label>
     <textarea id="address" required autocomplete="street-address" placeholder="المحافظة - المنطقة - الشارع - رقم المبنى"></textarea>
-    <label for="paymentMethod">طريقة الدفع</label>
-    <select id="paymentMethod" required>
-      <option value="">اختر طريقة الدفع</option>
-      <option value="Paymob">الدفع الإلكتروني — Paymob</option>
-      <option value="Vodafone Cash">Vodafone Cash</option>
-      <option value="InstaPay">InstaPay</option>
-    </select>
+    <label>طريقة الدفع</label>
+    <div class="payment-methods" id="paymentMethods" role="radiogroup" aria-label="طريقة الدفع">
+      <label class="payment-option active">
+        <input type="radio" name="paymentMethod" value="Paymob" checked>
+        <span class="payment-icon payment-paymob">PAYMOB</span>
+        <span class="payment-copy"><b>الدفع الإلكتروني</b><small>بطاقة بنكية / Visa / Mastercard / Meeza</small></span>
+      </label>
+      <label class="payment-option">
+        <input type="radio" name="paymentMethod" value="Vodafone Cash">
+        <span class="payment-icon payment-vodafone">VF</span>
+        <span class="payment-copy"><b>Vodafone Cash</b><small>الدفع بالمحفظة</small></span>
+      </label>
+      <label class="payment-option">
+        <input type="radio" name="paymentMethod" value="InstaPay">
+        <span class="payment-icon payment-instapay">IP</span>
+        <span class="payment-copy"><b>InstaPay</b><small>تحويل فوري</small></span>
+      </label>
+    </div>
+    <div class="payment-brands" aria-label="وسائل الدفع الإلكتروني">
+      <span class="brand-chip visa">VISA</span>
+      <span class="brand-chip mastercard"><i></i><i></i><b>mastercard</b></span>
+      <span class="brand-chip meeza">ميزة</span>
+      <span class="brand-chip paymob">Paymob</span>
+    </div>
     <p class="muted checkout-note">الشحن: 50 جنيه</p>
     <button class="btn checkout-submit" id="submitOrder" type="submit">تأكيد الطلب</button>
     <div id="checkoutMsg" class="checkout-message" role="status"></div>
@@ -79,12 +96,18 @@ async function pollPayment(code){
   msg('عملية الدفع ما زالت قيد التحقق. احتفظ بكود الطلب ويمكنك متابعة حالته لاحقًا.');
   $('#successActions').classList.remove('hidden');
 }
+$$('.payment-option').forEach(option=>option.addEventListener('click',()=>{
+  $$('.payment-option').forEach(x=>x.classList.remove('active'));
+  option.classList.add('active');
+  const input=option.querySelector('input'); if(input) input.checked=true;
+}));
+
 $('#checkoutForm').onsubmit=async e=>{
   e.preventDefault();
   if(!product)return;
   const btn=$('#submitOrder');btn.disabled=true;msg('جاري إنشاء الطلب...');
   try{
-    const paymentMethod=$('#paymentMethod').value;
+    const paymentMethod=$("input[name=paymentMethod]:checked")?.value || "";
     const payload={productId:id,color,size,quantity,customerName:$('#customerName').value.trim(),phone:$('#phone').value.trim(),email:$('#email').value.trim(),address:$('#address').value.trim(),paymentMethod};
     const r=await fetch(`${API_URL}/orders`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'فشل إنشاء الطلب');

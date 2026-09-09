@@ -131,16 +131,35 @@ function observeReveals() {
 async function home() {
   fetch(`${API_URL}/visits`, { method: "POST" }).catch(() => {});
   try {
-    const [{ products }, { banners }, { offers }] = await Promise.all([publicApi("/products"), publicApi("/banners"), publicApi("/offers")]);
+    const [{ products }, { banners }, { offers }] = await Promise.all([
+      publicApi("/products"), publicApi("/banners"), publicApi("/offers")
+    ]);
+
     const shuffled = shuffle(products || []);
     const designs = shuffled.filter(p => p.category !== "أنمي");
     const anime = shuffled.filter(p => p.category === "أنمي");
+
     const dEl = $("#productsDesigns"), aEl = $("#productsAnime");
     if (dEl) dEl.innerHTML = designs.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
-    if (aEl) aEl.innerHTML = anime.map(card).join("") || `<p class="empty-state">لا توجد رسومات أنمي حالياً</p>`;
+
+    // The second section must always have a real grid. If no anime products
+    // exist yet, show a separate shuffled selection of the normal collection.
+    const secondGrid = anime.length ? anime : shuffle(designs).slice(0, 8);
+    if (aEl) {
+      aEl.innerHTML = secondGrid.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
+      const title = $("#animeTitle");
+      if (title) title.textContent = anime.length ? "رسومات الأنمي" : "اختيارات AXEL";
+    }
+
     setupBanners(banners || []);
-    if (offers?.length && $("#offer")) { const o=offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent=o.title||"عرض محدود"; count(o.endsAt?.seconds ? o.endsAt.seconds*1000 : new Date(o.endsAt).getTime()); }
-    setupRail("designs"); setupRail("anime"); observeReveals();
+    if (offers?.length && $("#offer")) {
+      const o=offers[0]; $("#offer").classList.remove("hidden");
+      $("#offerTitle").textContent=o.title||"عرض محدود";
+      count(o.endsAt?.seconds ? o.endsAt.seconds*1000 : new Date(o.endsAt).getTime());
+    }
+    setupRail("designs");
+    // The second section is a grid, not a horizontal slider.
+    observeReveals();
   } catch(e) { console.error(e); showToast(e.message, true); }
 }
 

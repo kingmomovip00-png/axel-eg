@@ -535,7 +535,11 @@ app.post("/api/paymob/webhook", async (req, res) => {
   }
 });
 
-app.use(express.static(__dirname, { index: "index.html", extensions: ["html"] }));
+app.use(express.static(__dirname, {
+  index: "index.html",
+  extensions: ["html"],
+  setHeaders(res) { res.setHeader("Cache-Control", "no-cache, must-revalidate"); }
+}));
 app.get("*", (req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ ok: false, error: "API endpoint غير موجود" });
   res.sendFile(path.join(__dirname, "index.html"));
