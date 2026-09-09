@@ -2,50 +2,77 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>AXEL | Fashion & Designs</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1d1d1b">
+  <title>AXEL | ملابس رجالي</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="store-home">
+<body>
 <header class="header">
-  <div class="container nav nav-new">
-    <a class="nav-link nav-home-link" href="#designs">التصميمات</a>
-    <a class="brand-link" href="index.html" aria-label="AXEL"><img src="assets/logo/logo.png" class="brand-logo brand-logo-home" alt="AXEL"></a>
-    <a class="nav-link nav-track-link" href="track.html"><img src="assets/icons/track.svg" class="site-icon" alt="">حالة الطلب</a>
+  <div class="container nav">
+    <a class="nav-left nav-pill" href="#designs">التصميمات</a>
+    <a class="nav-logo-link" href="index.html" aria-label="AXEL"><img src="assets/logo/logo.png" class="brand-logo" alt="AXEL"></a>
+    <a class="nav-side nav-pill nav-icon-link" href="track.html"><img src="assets/icons/track.svg" alt=""> <span>تتبع الطلب</span></a>
   </div>
 </header>
 
 <main>
-  <section class="container home-banner-wrap reveal" id="hero"></section>
+  <div class="container">
+    <section class="hero banner-frame" aria-label="عروض AXEL">
+      <div id="bannerOne" class="banner-stage"></div>
+      <div class="banner-dots" id="bannerDotsOne" aria-hidden="true"></div>
+    </section>
 
-  <section id="designs" class="container store-section reveal">
-    <div class="section-heading"><div><span class="section-kicker">AXEL COLLECTION</span><h2>أحدث التصميمات</h2></div><span class="section-line"></span></div>
-    <div id="productsDesigns" class="product-grid featured-grid"></div>
-  </section>
+    <section id="designs" class="section reveal-section">
+      <div class="section-heading">
+        <div><span class="eyebrow">AXEL COLLECTION</span><h2>التصميمات</h2></div>
+        <div class="slider-controls" aria-label="التحكم في التصميمات">
+          <button type="button" class="slider-btn" data-slider="designs" data-dir="next" aria-label="التالي">‹</button>
+          <button type="button" class="slider-btn" data-slider="designs" data-dir="prev" aria-label="السابق">›</button>
+        </div>
+      </div>
+      <div id="productsDesigns" class="product-rail" tabindex="0" aria-label="التصميمات"></div>
+    </section>
 
-  <section class="container mid-banner-wrap reveal" id="midBanner"></section>
+    <section class="mid-banner banner-frame reveal-section" aria-label="بانر AXEL الثاني">
+      <div id="bannerTwo" class="banner-stage"></div>
+      <div class="banner-dots" id="bannerDotsTwo" aria-hidden="true"></div>
+    </section>
 
-  <section id="anime" class="container store-section reveal">
-    <div class="section-heading"><div><span class="section-kicker">AXEL ART</span><h2>رسومات الأنمي</h2></div><span class="section-line"></span></div>
-    <div id="productsAnime" class="product-grid art-grid"></div>
-  </section>
+    <section id="anime" class="section reveal-section">
+      <div class="section-heading">
+        <div><span class="eyebrow">SPECIAL DROP</span><h2>رسومات الأنمي</h2></div>
+        <div class="slider-controls" aria-label="التحكم في رسومات الأنمي">
+          <button type="button" class="slider-btn" data-slider="anime" data-dir="next" aria-label="التالي">‹</button>
+          <button type="button" class="slider-btn" data-slider="anime" data-dir="prev" aria-label="السابق">›</button>
+        </div>
+      </div>
+      <div id="productsAnime" class="product-grid-anime" tabindex="0" aria-label="رسومات الأنمي"></div>
+    </section>
 
-  <section id="offer" class="container offer hidden reveal"><span class="section-kicker">LIMITED TIME</span><h2 id="offerTitle"></h2><div id="countdown" class="countdown"></div></section>
+    <section id="offer" class="offer hidden reveal-section">
+      <div><span class="eyebrow">LIMITED OFFER</span><h2 id="offerTitle"></h2></div>
+      <div id="countdown" class="countdown"></div>
+    </section>
+  </div>
 </main>
 
-<footer class="footer footer-new">
+<footer class="footer">
   <div class="container footer-inner">
-    <div class="footer-brand"><img src="assets/logo/logo.png" class="brand-logo footer-logo" alt="AXEL"><p>تصميمات واختيارات مميزة من AXEL.</p></div>
-    <div class="footer-social-wrap"><span>تابعنا</span><div class="socials">
-      <a href="https://www.facebook.com/share/1DmkpdyAWo/" target="_blank" rel="noopener" aria-label="Facebook"><img src="assets/icons/facebook.svg" alt="Facebook"></a>
-      <a href="https://www.instagram.com/axel.egypt" target="_blank" rel="noopener" aria-label="Instagram"><img src="assets/icons/instagram.svg" alt="Instagram"></a>
-      <a href="https://www.tiktok.com/@axel_egypt" target="_blank" rel="noopener" aria-label="TikTok"><img src="assets/icons/tiktok.svg" alt="TikTok"></a>
-      <a href="https://wa.me/201153040626" target="_blank" rel="noopener" aria-label="WhatsApp"><img src="assets/icons/whatsapp.svg" alt="WhatsApp"></a>
-    </div></div>
+    <div class="footer-brand"><img src="assets/logo/logo.png" class="footer-logo" alt="AXEL"><p>Oversize T-shirts بطابع AXEL</p></div>
+    <div class="footer-links"><a href="index.html">الرئيسية</a><a href="#designs">التصميمات</a><a href="track.html">تتبع الطلب</a></div>
+    <div class="socials" aria-label="التواصل">
+      <a href="https://www.facebook.com/share/1DmkpdyAWo/" target="_blank" rel="noopener" aria-label="Facebook"><img src="assets/icons/facebook.svg" alt=""></a>
+      <a href="https://www.instagram.com/axel.egypt" target="_blank" rel="noopener" aria-label="Instagram"><img src="assets/icons/instagram.svg" alt=""></a>
+      <a href="https://www.tiktok.com/@axel_egypt" target="_blank" rel="noopener" aria-label="TikTok"><img src="assets/icons/tiktok.svg" alt=""></a>
+      <a href="https://wa.me/201153040626" target="_blank" rel="noopener" aria-label="WhatsApp"><img src="assets/icons/whatsapp.svg" alt=""></a>
+    </div>
+    <div class="footer-bottom">Powered by GMV MEDIA</div>
   </div>
-  <div class="footer-bottom">Powered by <strong>GMV MEDIA</strong></div>
 </footer>
 
-<a class="wa" href="https://wa.me/201153040626" target="_blank" rel="noopener" aria-label="WhatsApp"><img src="assets/icons/whatsapp.svg" alt="WhatsApp"></a>
+<a class="wa" href="https://wa.me/201153040626" target="_blank" rel="noopener" aria-label="واتساب"><img src="assets/icons/whatsapp.svg" alt=""></a>
+<div id="siteToast" class="site-toast hidden"></div>
 <script type="module" src="js/site.js"></script>
-</body></html>
+</body>
+</html>

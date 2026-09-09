@@ -1,84 +1,101 @@
-import { API_URL } from "./config.js";
-const $ = s => document.querySelector(s);
+import { API_URL, SHIPPING_PRICE } from "./config.js";
+
+const $ = (s, root = document) => root.querySelector(s);
+const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const money = n => new Intl.NumberFormat("ar-EG", { maximumFractionDigits: 0 }).format(Number(n || 0)) + " ج";
+const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+const shuffle = arr => { const a = [...arr]; for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; };
 
 async function publicApi(path) {
-  const r = await fetch(`${API_URL}${path}`); const d = await r.json().catch(() => ({}));
-  if (!r.ok || d.ok === false) throw new Error(d.error || "حدث خطأ"); return d;
+  const r = await fetch(`${API_URL}${path}`, { headers: { Accept: "application/json" } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || d.ok === false) throw new Error(d.error || "حدث خطأ أثناء الاتصال بالموقع");
+  return d;
 }
 
-function esc(v="") { return String(v).replace(/[&<>'\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c])); }
-function card(p, variant="art") {
-  const image = p.images?.[0]?.url || "";
-  return `<a class="card ${variant === "featured" ? "featured-card" : "art-card"}" href="product.html?id=${encodeURIComponent(p.id)}">
-    <div class="card-image-wrap"><img loading="lazy" src="${image}" alt="${esc(p.name || "منتج AXEL")}"></div>
-    <div class="card-body"><span class="card-kicker">AXEL</span><b>${esc(p.name || "منتج AXEL")}</b><div class="price">${money(p.salePrice)} ${p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}</div></div>
+function randomImage(product) {
+  const images = Array.isArray(product.images) ? product.images.filter(x => x?.url) : [];
+  return images.length ? images[Math.floor(Math.random() * images.length)].url : "";
+}
+
+function card(p, index = 0) {
+  const image = randomImage(p);
+  return `<a class="card product-card reveal-card" style="--delay:${Math.min(index,8)*55}ms" href="product.html?id=${encodeURIComponent(p.id)}">
+    <div class="card-media">${image ? `<img loading="lazy" decoding="async" src="${escapeHtml(image)}" alt="${escapeHtml(p.name || "منتج AXEL")}">` : `<div class="image-empty">AXEL</div>`}</div>
+    <div class="card-body"><b>${escapeHtml(p.name || "منتج AXEL")}</b><div class="price">${money(p.salePrice)} ${p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}</div><span class="card-action">عرض المنتج</span></div>
   </a>`;
 }
-function bannerMarkup(b, cls="home-banner") {
-  return b ? `<img src="${b.imageUrl}" alt="AXEL banner" class="${cls}">` : "";
+
+function renderBanner(target, banner, index) {
+  if (!target) return;
+  if (!banner?.imageUrl) { target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`; return; }
+  target.classList.remove("banner-enter"); void target.offsetWidth; target.classList.add("banner-enter");
+  target.innerHTML = `<a href="${banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs"}" aria-label="عرض AXEL"><img src="${escapeHtml(banner.imageUrl)}" alt="AXEL" decoding="async"></a>`;
+  const dots = target.parentElement?.querySelector(".banner-dots");
+  if (dots) dots.innerHTML = "";
 }
+
+function setupBanners(banners) {
+  const list = shuffle((banners || []).filter(b => b?.imageUrl));
+  const source = list.length ? list : [null];
+  let i1 = Math.floor(Math.random()*source.length), i2 = Math.floor(Math.random()*source.length);
+  renderBanner($("#bannerOne"), source[i1], i1); renderBanner($("#bannerTwo"), source[i2], i2);
+  const tick = () => { i1=(i1+1)%source.length; i2=(i2+1)%source.length; renderBanner($("#bannerOne"),source[i1],i1); renderBanner($("#bannerTwo"),source[i2],i2); };
+  if (source.length > 1) setInterval(tick, 4000);
+}
+
+function setupRail(id) {
+  const el = document.getElementById(id); if (!el) return;
+  let timer;
+  const step = () => Math.max(220, Math.round(el.clientWidth * .72));
+  const move = dir => el.scrollBy({ left: dir * step(), behavior: "smooth" });
+  $$(`.slider-btn[data-slider="${id}"]`).forEach(btn => btn.addEventListener("click", () => move(btn.dataset.dir === "next" ? -1 : 1)));
+  const start = () => { clearInterval(timer); timer = setInterval(() => { if (document.visibilityState === "visible") { const max = el.scrollWidth - el.clientWidth; const atEnd = Math.abs(el.scrollLeft) >= max - 4 || Math.abs(el.scrollLeft) < 4 && getComputedStyle(el).direction === "ltr"; move(atEnd ? 1 : -1); } }, 4500); };
+  const stop = () => clearInterval(timer);
+  el.addEventListener("pointerdown", stop); el.addEventListener("pointerup", start); el.addEventListener("mouseleave", start); el.addEventListener("focusin", stop); el.addEventListener("focusout", start);
+  el.addEventListener("wheel", e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); el.scrollLeft += e.deltaY; } }, { passive:false });
+  start();
+}
+
+function observeReveals() {
+  const io = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting){e.target.classList.add("is-visible");io.unobserve(e.target);}}), {threshold:.08});
+  $$(".reveal-section,.reveal-card").forEach(x => io.observe(x));
+}
+
 async function home() {
   fetch(`${API_URL}/visits`, { method: "POST" }).catch(() => {});
   try {
-    const [{ products }, { banners }, { offers }] = await Promise.all([
-      publicApi("/products"), publicApi("/banners"), publicApi("/offers")
-    ]);
-    const designs = (products || []).filter(p => p.category !== "أنمي");
-    const anime = (products || []).filter(p => p.category === "أنمي");
+    const [{ products }, { banners }, { offers }] = await Promise.all([publicApi("/products"), publicApi("/banners"), publicApi("/offers")]);
+    const shuffled = shuffle(products || []);
+    const designs = shuffled.filter(p => p.category !== "أنمي");
+    const anime = shuffled.filter(p => p.category === "أنمي");
     const dEl = $("#productsDesigns"), aEl = $("#productsAnime");
-    if (dEl) dEl.innerHTML = designs.map(p => card(p, "featured")).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
-    if (aEl) aEl.innerHTML = anime.map(p => card(p, "art")).join("") || `<p class="empty-state">لا توجد رسومات أنمي حالياً</p>`;
+    if (dEl) dEl.innerHTML = designs.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
+    if (aEl) aEl.innerHTML = anime.map(card).join("") || `<p class="empty-state">لا توجد رسومات أنمي حالياً</p>`;
+    setupBanners(banners || []);
+    if (offers?.length && $("#offer")) { const o=offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent=o.title||"عرض محدود"; count(o.endsAt?.seconds ? o.endsAt.seconds*1000 : new Date(o.endsAt).getTime()); }
+    setupRail("designs"); setupRail("anime"); observeReveals();
+  } catch(e) { console.error(e); showToast(e.message, true); }
+}
 
-    const hero = $("#hero"), mid = $("#midBanner");
-    const firstBanner = banners?.[0], secondBanner = banners?.[1];
-    if (hero) hero.innerHTML = bannerMarkup(firstBanner) || `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`;
-    if (mid) {
-      mid.innerHTML = bannerMarkup(secondBanner, "mid-banner");
-      mid.classList.toggle("hidden", !secondBanner);
-    }
-    if (offers?.length && $("#offer")) {
-      const o = offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent = o.title;
-      count(o.endsAt?.seconds ? o.endsAt.seconds * 1000 : new Date(o.endsAt).getTime());
-    }
-    initReveal();
-  } catch (e) { console.error(e); }
-}
-function initReveal() {
-  const els = $$(".reveal");
-  if (!els.length) return;
-  if (!("IntersectionObserver" in window)) { els.forEach(x => x.classList.add("visible")); return; }
-  const io = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("visible"); io.unobserve(entry.target); } }), { threshold: .12 });
-  els.forEach(x => io.observe(x));
-}
-function count(end) { const el = $("#countdown"); if (!el) return; const timer = setInterval(() => { const x = Math.max(0, end - Date.now()); const h = Math.floor(x / 3600000), m = Math.floor(x % 3600000 / 60000), s = Math.floor(x % 60000 / 1000); el.textContent = `${String(h).padStart(2,"0")} : ${String(m).padStart(2,"0")} : ${String(s).padStart(2,"0")}`; if (!x) clearInterval(timer); }, 1000); }
+function count(end) { const el=$("#countdown"); if(!el||!Number.isFinite(end))return; const timer=setInterval(()=>{const x=Math.max(0,end-Date.now());const h=Math.floor(x/3600000),m=Math.floor(x%3600000/60000),s=Math.floor(x%60000/1000);el.textContent=`${String(h).padStart(2,"0")} : ${String(m).padStart(2,"0")} : ${String(s).padStart(2,"0")}`;if(!x)clearInterval(timer)},1000); }
+
+function showToast(msg, error=false) { const el=$("#siteToast"); if(!el)return; el.textContent=msg; el.classList.toggle("error",!!error); el.classList.remove("hidden"); clearTimeout(showToast.t); showToast.t=setTimeout(()=>el.classList.add("hidden"),4000); }
 
 async function product() {
-  const id = new URLSearchParams(location.search).get("id"); if (!id || !$("#pname")) return;
+  const id=new URLSearchParams(location.search).get("id"); if(!id||!$("#pname"))return;
   try {
-    const { product: p } = await publicApi(`/products/${encodeURIComponent(id)}`);
-    const images = p.images || []; let color = (p.colors || [images[0]?.color]).find(Boolean) || ""; let size = (p.sizes || [])[0] || "M"; let quantity = 1;
-    $("#pname").textContent = p.name; $("#pdesc").textContent = p.description || ""; $("#pprice").textContent = money(p.salePrice);
-    const gallery = $("#gallery");
-    function render() {
-      const colorImages = images.filter(x => x.color === color); const list = colorImages.length ? colorImages : images;
-      const main = list[0]; $("#pimage").src = main?.url || "";
-      if (gallery) gallery.innerHTML = list.map((im, i) => `<button class="thumb ${i === 0 ? "active" : ""}" data-img="${i}"><img src="${im.url}" alt="${p.name}"></button>`).join("");
-      const colors = p.colors?.length ? p.colors : [...new Set(images.map(x => x.color).filter(Boolean))];
-      $("#colors").innerHTML = colors.map(c => `<button type="button" class="option ${c === color ? "active" : ""}" data-color="${c}">${c}</button>`).join("");
-      $("#sizes").innerHTML = (p.sizes || ["M","L","XL","XXL"]).map(z => { const q = Number(p.stock?.[color]?.[z] || 0); return `<button type="button" class="option ${z === size ? "active" : ""} ${q <= 0 ? "sold-out" : ""}" data-size="${z}" ${q <= 0 ? "disabled" : ""}>${z}</button>`; }).join("");
-      const available = Number(p.stock?.[color]?.[size] || 0); if (available <= 0) { const next = (p.sizes || []).find(z => Number(p.stock?.[color]?.[z] || 0) > 0); if (next && next !== size) { size = next; return render(); } }
-      $("#stock").textContent = available ? `المتاح: ${available} قطعة` : "نفذت الكمية";
-      $("#quantityValue").textContent = quantity; $("#buy").disabled = !available;
-    }
-    $("#colors").onclick = e => { const b = e.target.closest("[data-color]"); if (b) { color = b.dataset.color; const availableSize = (p.sizes || []).find(z => Number(p.stock?.[color]?.[z] || 0) > 0); if (availableSize) size = availableSize; quantity = 1; render(); } };
-    $("#sizes").onclick = e => { const b = e.target.closest("[data-size]"); if (b && !b.disabled) { size = b.dataset.size; quantity = 1; render(); } };
-    gallery?.addEventListener("click", e => { const b = e.target.closest("[data-img]"); if (!b) return; const list = images.filter(x => x.color === color); const activeList = list.length ? list : images; $("#pimage").src = activeList[Number(b.dataset.img)]?.url || ""; $$(".thumb").forEach(x => x.classList.remove("active")); b.classList.add("active"); });
-    $("#qtyMinus").onclick = () => { quantity = Math.max(1, quantity - 1); render(); };
-    $("#qtyPlus").onclick = () => { const max = Number(p.stock?.[color]?.[size] || 0); quantity = Math.min(max || 1, quantity + 1); render(); };
-    $("#buy").onclick = () => location.href = `checkout.html?id=${encodeURIComponent(id)}&color=${encodeURIComponent(color)}&size=${encodeURIComponent(size)}&quantity=${quantity}`;
+    const {product:p}=await publicApi(`/products/${encodeURIComponent(id)}`);
+    const images=p.images||[]; let color=(p.colors||[images[0]?.color]).find(Boolean)||""; let size=(p.sizes||[])[0]||"M"; let quantity=1;
+    $("#pname").textContent=p.name||"منتج AXEL"; $("#pdesc").textContent=p.description||"Oversize T-shirt"; $("#pprice").textContent=money(p.salePrice);
+    const gallery=$("#gallery");
+    function render(){const colorImages=images.filter(x=>x.color===color);const list=colorImages.length?shuffle(colorImages):shuffle(images);const main=list[0];$("#pimage").src=main?.url||"";if(gallery)gallery.innerHTML=list.map((im,i)=>`<button class="thumb ${i===0?"active":""}" data-img-url="${escapeHtml(im.url)}" type="button"><img loading="lazy" src="${escapeHtml(im.url)}" alt="${escapeHtml(p.name)}"></button>`).join("");const colors=p.colors?.length?p.colors:[...new Set(images.map(x=>x.color).filter(Boolean))];$("#colors").innerHTML=colors.map(c=>`<button type="button" class="option ${c===color?"active":""}" data-color="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");$("#sizes").innerHTML=(p.sizes||["M","L","XL","XXL"]).map(z=>{const q=Number(p.stock?.[color]?.[z]||0);return `<button type="button" class="option ${z===size?"active":""} ${q<=0?"sold-out":""}" data-size="${escapeHtml(z)}" ${q<=0?"disabled":""}>${escapeHtml(z)}</button>`}).join("");const available=Number(p.stock?.[color]?.[size]||0);if(available<=0){const next=(p.sizes||[]).find(z=>Number(p.stock?.[color]?.[z]||0)>0);if(next&&next!==size){size=next;return render();}}$("#stock").textContent=available?`المتاح: ${available} قطعة`:"نفذت الكمية";$("#quantityValue").textContent=quantity;$("#buy").disabled=!available;}
+    $("#colors").onclick=e=>{const b=e.target.closest("[data-color]");if(b){color=b.dataset.color;const n=(p.sizes||[]).find(z=>Number(p.stock?.[color]?.[z]||0)>0);if(n)size=n;quantity=1;render();}};
+    $("#sizes").onclick=e=>{const b=e.target.closest("[data-size]");if(b&&!b.disabled){size=b.dataset.size;quantity=1;render();}};
+    gallery?.addEventListener("click",e=>{const b=e.target.closest("[data-img-url]");if(!b)return;$("#pimage").src=b.dataset.imgUrl;$$('.thumb',gallery).forEach(x=>x.classList.remove("active"));b.classList.add("active");});
+    $("#qtyMinus").onclick=()=>{quantity=Math.max(1,quantity-1);render()};$("#qtyPlus").onclick=()=>{const max=Number(p.stock?.[color]?.[size]||0);quantity=Math.min(max||1,quantity+1);render()};$("#buy").onclick=()=>location.href=`checkout.html?id=${encodeURIComponent(id)}&color=${encodeURIComponent(color)}&size=${encodeURIComponent(size)}&quantity=${quantity}`;
     render();
-  } catch (e) { $("#pname").textContent = e.message || "تعذر تحميل المنتج"; }
+  } catch(e) { $("#pname").textContent=e.message||"تعذر تحميل المنتج"; }
 }
-const $$ = s => [...document.querySelectorAll(s)];
-home(); product();
+
+if (location.pathname.endsWith("product.html")) product(); else home();
