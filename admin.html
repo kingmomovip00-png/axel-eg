@@ -2,149 +2,134 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#1d1d1b">
-  <title>AXEL | لوحة التحكم</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#121212">
+  <title>AXEL | الإدارة</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="admin-page">
-<header class="admin-topbar">
-  <div class="container admin-topbar-inner">
-    <a href="index.html" class="admin-brand" aria-label="العودة إلى المتجر">
-      <img src="assets/logo/logo.png" alt="AXEL">
-    </a>
-    <nav class="admin-nav" aria-label="تنقل لوحة التحكم">
-      <button type="button" class="admin-nav-btn active" data-view="dashboard">الرئيسية</button>
-      <button type="button" class="admin-nav-btn" data-view="product">المنتجات</button>
-      <button type="button" class="admin-nav-btn" data-view="banners">البانرات</button>
-      <button type="button" class="admin-nav-btn" data-view="orders">الطلبات</button>
+<body class="ax-admin">
+  <header class="ax-header">
+    <div class="ax-header-row">
+      <a class="ax-logo" href="index.html" aria-label="الذهاب للمتجر"><img src="assets/logo/logo.png" alt="AXEL"></a>
+      <div class="ax-header-title"><strong>لوحة إدارة AXEL</strong><small id="adminEmail">جاري التحقق...</small></div>
+      <button id="logout" class="ax-btn ax-btn-light" type="button">خروج</button>
+    </div>
+    <nav class="ax-tabs" aria-label="أقسام الإدارة">
+      <button type="button" class="ax-tab active" data-view="home">الرئيسية</button>
+      <button type="button" class="ax-tab" data-view="products">المنتجات</button>
+      <button type="button" class="ax-tab" data-view="orders">الطلبات</button>
+      <button type="button" class="ax-tab" data-view="banners">البانرات</button>
     </nav>
-    <div class="admin-user">
-      <span id="adminEmail">...</span>
-      <button id="logout" type="button" class="btn ghost small-btn">تسجيل الخروج</button>
-    </div>
-  </div>
-</header>
+  </header>
 
-<main class="container admin-shell">
-  <div id="globalNotice" class="admin-notice hidden" role="status"></div>
+  <main class="ax-main">
+    <div id="notice" class="ax-notice hidden" role="alert"></div>
 
-  <section class="admin-view active" data-view-panel="dashboard">
-    <div class="admin-page-heading">
-      <div><p class="eyebrow">AXEL ADMIN</p><h1>لوحة التحكم</h1><p class="muted">إدارة المنتجات والبانرات والطلبات من مكان واحد.</p></div>
-      <button id="dashboardRefresh" type="button" class="btn ghost">تحديث البيانات</button>
-    </div>
-    <div class="admin-stat-grid">
-      <article class="admin-stat-card"><span>المنتجات</span><strong id="productsCount">0</strong></article>
-      <article class="admin-stat-card"><span>الطلبات</span><strong id="ordersCount">0</strong></article>
-      <article class="admin-stat-card"><span>إجمالي المبيعات</span><strong id="salesCount">0 ج</strong></article>
-    </div>
-    <div class="admin-quick-grid">
-      <button type="button" class="admin-quick-card" data-go-view="product"><b>إضافة منتج جديد</b><span>أضف صور متعددة، ألوان، مقاسات وكميات</span></button>
-      <button type="button" class="admin-quick-card" data-go-view="banners"><b>إدارة البانرات</b><span>ارفع، أظهر، أخفِ أو احذف البانرات</span></button>
-      <button type="button" class="admin-quick-card" data-go-view="orders"><b>متابعة الطلبات</b><span>شاهد الطلبات وعدّل حالة الطلب والدفع</span></button>
-    </div>
-  </section>
+    <section class="ax-view active" data-panel="home">
+      <div class="ax-page-head"><div><h1>نظرة سريعة</h1><p>كل ما تحتاجه لإدارة المتجر في مكان واحد.</p></div><button id="refreshAll" class="ax-btn ax-btn-light" type="button">تحديث البيانات</button></div>
+      <div class="ax-stats">
+        <article><span>المنتجات</span><strong id="statProducts">0</strong></article>
+        <article><span>الطلبات</span><strong id="statOrders">0</strong></article>
+        <article><span>إجمالي المبيعات</span><strong id="statSales">0 ج</strong></article>
+      </div>
+      <div class="ax-home-actions">
+        <button type="button" data-open-view="products"><b>إضافة منتج</b><span>صور، ألوان، مقاسات وكميات</span></button>
+        <button type="button" data-open-view="orders"><b>متابعة الطلبات</b><span>تعديل حالة الطلب والدفع</span></button>
+        <button type="button" data-open-view="banners"><b>إدارة البانرات</b><span>إضافة وحذف وإظهار البانرات</span></button>
+      </div>
+    </section>
 
-  <section class="admin-view" data-view-panel="product">
-    <div class="admin-page-heading">
-      <div><p class="eyebrow">PRODUCTS</p><h1 id="productFormTitle">إضافة منتج</h1><p class="muted">أكمل البيانات ثم ارفع الصور وبعدها احفظ المنتج.</p></div>
-      <button id="cancelEdit" type="button" class="btn ghost hidden">إلغاء التعديل</button>
-    </div>
-
-    <div class="admin-two-column">
-      <section class="admin-card">
-        <form id="productForm" novalidate>
-          <div class="admin-form-section">
-            <h2>بيانات المنتج</h2>
-            <label>اسم المنتج<input name="name" required placeholder="مثال: تيشيرت AXEL"></label>
-            <div class="form-row">
-              <label>التصنيف<select name="category"><option value="تصميمات">تصميمات</option><option value="أنمي">أنمي</option></select></label>
-              <label>سعر البيع<input name="salePrice" type="number" min="1" required placeholder="530"></label>
+    <section class="ax-view" data-panel="products">
+      <div class="ax-page-head"><div><h1 id="productTitle">إضافة منتج جديد</h1><p>املأ البيانات بالترتيب. لا يتم حفظ المنتج إلا بعد رفع الصور بنجاح.</p></div></div>
+      <div class="ax-product-layout">
+        <form id="productForm" class="ax-card ax-product-form" novalidate>
+          <section class="ax-section">
+            <h2>1. بيانات المنتج</h2>
+            <div class="ax-grid two">
+              <label>اسم المنتج <input name="name" required placeholder="اسم المنتج"></label>
+              <label>التصنيف <select name="category"><option>تصميمات</option><option>أنمي</option><option>تيشيرتات</option><option>هوديز</option></select></label>
+              <label>سعر البيع <input name="salePrice" type="number" min="1" inputmode="numeric" required placeholder="530"></label>
+              <label>السعر القديم <input name="oldPrice" type="number" min="0" inputmode="numeric" placeholder="اختياري"></label>
             </div>
-            <label>السعر القديم <span class="muted">(اختياري)</span><input name="oldPrice" type="number" min="0" placeholder="650"></label>
-            <label>وصف المنتج<textarea name="description" placeholder="اكتب وصف المنتج"></textarea></label>
-          </div>
+            <label>وصف المنتج <textarea name="description" rows="4" placeholder="اكتب وصفًا مختصرًا وواضحًا"></textarea></label>
+          </section>
 
-          <div class="admin-form-section">
-            <h2>الألوان والمقاسات</h2>
-            <p class="admin-field-title">الألوان المتاحة</p>
-            <div id="colorChoices" class="choice-grid">
-              <label class="choice-check"><input type="checkbox" value="أبيض" checked><span>أبيض</span></label>
-              <label class="choice-check"><input type="checkbox" value="أسود"><span>أسود</span></label>
-              <label class="choice-check"><input type="checkbox" value="لبني"><span>لبني</span></label>
-              <label class="choice-check"><input type="checkbox" value="بترولي"><span>بترولي</span></label>
+          <section class="ax-section">
+            <h2>2. الألوان والمقاسات</h2>
+            <div class="ax-options-block">
+              <span class="ax-label">الألوان المتاحة</span>
+              <div id="colorOptions" class="ax-checks">
+                <label><input type="checkbox" value="أبيض" checked><span>أبيض</span></label>
+                <label><input type="checkbox" value="أسود"><span>أسود</span></label>
+                <label><input type="checkbox" value="لبني"><span>لبني</span></label>
+                <label><input type="checkbox" value="بترولي"><span>بترولي</span></label>
+              </div>
+              <label>ألوان إضافية <input id="extraColors" placeholder="مثال: رمادي، بيج"></label>
             </div>
-            <label>ألوان إضافية مفصولة بفاصلة<input id="customColors" placeholder="مثال: رمادي، بيج"></label>
-
-            <p class="admin-field-title">المقاسات المتاحة</p>
-            <div id="sizeChoices" class="choice-grid">
-              <label class="choice-check"><input type="checkbox" value="S"><span>S</span></label>
-              <label class="choice-check"><input type="checkbox" value="M" checked><span>M</span></label>
-              <label class="choice-check"><input type="checkbox" value="L" checked><span>L</span></label>
-              <label class="choice-check"><input type="checkbox" value="XL" checked><span>XL</span></label>
-              <label class="choice-check"><input type="checkbox" value="XXL" checked><span>XXL</span></label>
+            <div class="ax-options-block">
+              <span class="ax-label">المقاسات المتاحة</span>
+              <div id="sizeOptions" class="ax-checks">
+                <label><input type="checkbox" value="S"><span>S</span></label>
+                <label><input type="checkbox" value="M" checked><span>M</span></label>
+                <label><input type="checkbox" value="L" checked><span>L</span></label>
+                <label><input type="checkbox" value="XL" checked><span>XL</span></label>
+                <label><input type="checkbox" value="XXL" checked><span>XXL</span></label>
+              </div>
             </div>
-            <div id="stockEditor" class="stock-editor"></div>
-          </div>
+            <div id="stockBox" class="ax-stock-box"></div>
+          </section>
 
-          <div class="admin-form-section">
-            <h2>صور المنتج</h2>
-            <div class="form-row">
-              <label>لون الصور<select id="imageColorSelect"></select></label>
-              <label>اختيار الصور<input id="productImages" type="file" accept="image/*" multiple></label>
+          <section class="ax-section">
+            <h2>3. صور المنتج</h2>
+            <p class="ax-help">اختر لون الصور أولاً، ثم اختر صورة واحدة أو أكثر، ثم اضغط <b>رفع الصور</b>.</p>
+            <div class="ax-grid two">
+              <label>لون الصور <select id="imageColor"></select></label>
+              <label class="ax-file-label">اختيار ملفات الصور <input id="productFiles" type="file" accept="image/*" multiple></label>
             </div>
-            <p class="muted">يمكن اختيار ورفع عدة صور في نفس المرة. اختر اللون ثم الصور واضغط رفع الصور.</p>
-            <div id="preview" class="upload-preview"></div>
-            <button id="uploadProductImages" type="button" class="btn">رفع الصور المختارة</button>
-            <div class="progress"><i id="uploadBar"></i></div>
-            <p id="uploadStatus" class="muted"></p>
-            <div id="uploadedImagesList" class="uploaded-images-list"></div>
-          </div>
+            <div id="selectedPreview" class="ax-preview"></div>
+            <button id="uploadImages" type="button" class="ax-btn ax-btn-primary">رفع الصور</button>
+            <div class="ax-progress"><i id="imageProgress"></i></div>
+            <p id="imageMessage" class="ax-inline-message"></p>
+            <div id="uploadedImages" class="ax-uploaded"></div>
+          </section>
 
-          <div class="admin-form-actions">
-            <button id="saveProduct" type="submit" class="btn admin-primary">حفظ المنتج</button>
-            <button id="resetProduct" type="button" class="btn ghost">تفريغ النموذج</button>
+          <div class="ax-form-actions">
+            <button id="saveProduct" type="submit" class="ax-btn ax-btn-primary">حفظ المنتج</button>
+            <button id="cancelEdit" type="button" class="ax-btn ax-btn-light hidden">إلغاء التعديل</button>
+            <button id="clearProduct" type="button" class="ax-btn ax-btn-light">تفريغ النموذج</button>
           </div>
         </form>
-      </section>
 
-      <aside class="admin-card admin-catalog-card">
-        <div class="section-title"><div><p class="eyebrow">CATALOG</p><h2>المنتجات الحالية</h2></div><button id="refreshProducts" type="button" class="btn ghost small-btn">تحديث</button></div>
-        <div id="productsList" class="manager-grid"></div>
-      </aside>
-    </div>
-  </section>
-
-  <section class="admin-view" data-view-panel="banners">
-    <div class="admin-page-heading"><div><p class="eyebrow">BANNERS</p><h1>إدارة البانرات</h1><p class="muted">ارفع بانر جديد ثم أدر ظهوره أو احذفه.</p></div></div>
-    <div class="admin-two-column">
-      <section class="admin-card">
-        <h2>رفع بانر جديد</h2>
-        <label>اختيار صورة البانر<input id="bannerFile" type="file" accept="image/*"></label>
-        <div id="bannerPreview" class="banner-preview"></div>
-        <button id="bannerUpload" type="button" class="btn admin-primary">رفع البانر</button>
-        <div class="progress"><i id="bannerBar"></i></div>
-        <p id="bannerStatus" class="muted"></p>
-      </section>
-      <section class="admin-card">
-        <div class="section-title"><div><h2>البانرات الحالية</h2></div><button id="refreshBanners" type="button" class="btn ghost small-btn">تحديث</button></div>
-        <div id="bannersList" class="manager-list"></div>
-      </section>
-    </div>
-
-    <section class="admin-card admin-offer-card">
-      <div><p class="eyebrow">OFFER</p><h2>إضافة عرض</h2></div>
-      <form id="offerForm" class="offer-form"><input name="title" required placeholder="عنوان العرض"><input name="endsAt" type="datetime-local" required><button type="submit" class="btn">إضافة العرض</button></form>
+        <aside class="ax-card ax-list-card">
+          <div class="ax-list-head"><div><h2>المنتجات الحالية</h2><p>تعديل، استبدال أو حذف أي منتج.</p></div><button id="refreshProducts" type="button" class="ax-btn ax-btn-light">تحديث</button></div>
+          <div id="productsList" class="ax-manager-list"></div>
+        </aside>
+      </div>
     </section>
-  </section>
 
-  <section class="admin-view" data-view-panel="orders">
-    <div class="admin-page-heading"><div><p class="eyebrow">ORDERS</p><h1>إدارة الطلبات</h1><p class="muted">تابع حالة كل طلب وعدّل حالة الدفع.</p></div><button id="refreshOrders" type="button" class="btn ghost">تحديث الطلبات</button></div>
-    <section class="admin-card"><div id="ordersList" class="orders-manager"></div></section>
-  </section>
-</main>
+    <section class="ax-view" data-panel="orders">
+      <div class="ax-page-head"><div><h1>الطلبات</h1><p>شاهد تفاصيل كل طلب وحدّث حالته.</p></div><button id="refreshOrders" class="ax-btn ax-btn-light" type="button">تحديث الطلبات</button></div>
+      <div id="ordersList" class="ax-orders"></div>
+    </section>
 
-<script type="module" src="js/admin.js"></script>
+    <section class="ax-view" data-panel="banners">
+      <div class="ax-page-head"><div><h1>البانرات</h1><p>اختر صورة بانر ثم ارفعها لتظهر في الموقع.</p></div></div>
+      <div class="ax-banner-layout">
+        <section class="ax-card">
+          <h2>إضافة بانر جديد</h2>
+          <label class="ax-file-label">اختيار صورة البانر <input id="bannerFile" type="file" accept="image/*"></label>
+          <div id="bannerPreview" class="ax-banner-preview"></div>
+          <button id="uploadBanner" type="button" class="ax-btn ax-btn-primary">رفع البانر</button>
+          <div class="ax-progress"><i id="bannerProgress"></i></div>
+          <p id="bannerMessage" class="ax-inline-message"></p>
+        </section>
+        <section class="ax-card">
+          <div class="ax-list-head"><div><h2>البانرات الحالية</h2><p>إظهار أو إخفاء أو حذف.</p></div><button id="refreshBanners" type="button" class="ax-btn ax-btn-light">تحديث</button></div>
+          <div id="bannersList" class="ax-manager-list"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="js/admin.js"></script>
 </body>
 </html>
