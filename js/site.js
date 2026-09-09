@@ -7,25 +7,49 @@ async function publicApi(path) {
   if (!r.ok || d.ok === false) throw new Error(d.error || "حدث خطأ"); return d;
 }
 
-function card(p) {
-  return `<a class="card" href="product.html?id=${encodeURIComponent(p.id)}"><img loading="lazy" src="${p.images?.[0]?.url || ""}" alt="${String(p.name || "").replace(/\"/g, "&quot;")}"><div class="card-body"><b>${p.name || "منتج AXEL"}</b><div class="price">${money(p.salePrice)} ${p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}</div></div></a>`;
+function esc(v="") { return String(v).replace(/[&<>'\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c])); }
+function card(p, variant="art") {
+  const image = p.images?.[0]?.url || "";
+  return `<a class="card ${variant === "featured" ? "featured-card" : "art-card"}" href="product.html?id=${encodeURIComponent(p.id)}">
+    <div class="card-image-wrap"><img loading="lazy" src="${image}" alt="${esc(p.name || "منتج AXEL")}"></div>
+    <div class="card-body"><span class="card-kicker">AXEL</span><b>${esc(p.name || "منتج AXEL")}</b><div class="price">${money(p.salePrice)} ${p.oldPrice ? `<span class="old">${money(p.oldPrice)}</span>` : ""}</div></div>
+  </a>`;
 }
-
+function bannerMarkup(b, cls="home-banner") {
+  return b ? `<img src="${b.imageUrl}" alt="AXEL banner" class="${cls}">` : "";
+}
 async function home() {
   fetch(`${API_URL}/visits`, { method: "POST" }).catch(() => {});
   try {
     const [{ products }, { banners }, { offers }] = await Promise.all([
       publicApi("/products"), publicApi("/banners"), publicApi("/offers")
     ]);
-    const shuffled = [...products].sort(() => Math.random() - .5);
-    const designs = shuffled.filter(p => p.category !== "أنمي"); const anime = shuffled.filter(p => p.category === "أنمي");
-    const dEl = $("#productsDesigns"); const aEl = $("#productsAnime");
-    if (dEl) dEl.innerHTML = designs.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
-    if (aEl) aEl.innerHTML = anime.map(card).join("") || `<p class="empty-state">لا توجد رسومات أنمي حالياً</p>`;
-    const hero = $("#hero");
-    if (hero) hero.innerHTML = banners.length ? `<img src="${banners[Math.floor(Math.random() * banners.length)].imageUrl}" alt="AXEL banner">` : `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`;
-    if (offers.length && $("#offer")) { const o = offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent = o.title; count(o.endsAt?.seconds ? o.endsAt.seconds * 1000 : new Date(o.endsAt).getTime()); }
+    const designs = (products || []).filter(p => p.category !== "أنمي");
+    const anime = (products || []).filter(p => p.category === "أنمي");
+    const dEl = $("#productsDesigns"), aEl = $("#productsAnime");
+    if (dEl) dEl.innerHTML = designs.map(p => card(p, "featured")).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
+    if (aEl) aEl.innerHTML = anime.map(p => card(p, "art")).join("") || `<p class="empty-state">لا توجد رسومات أنمي حالياً</p>`;
+
+    const hero = $("#hero"), mid = $("#midBanner");
+    const firstBanner = banners?.[0], secondBanner = banners?.[1];
+    if (hero) hero.innerHTML = bannerMarkup(firstBanner) || `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`;
+    if (mid) {
+      mid.innerHTML = bannerMarkup(secondBanner, "mid-banner");
+      mid.classList.toggle("hidden", !secondBanner);
+    }
+    if (offers?.length && $("#offer")) {
+      const o = offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent = o.title;
+      count(o.endsAt?.seconds ? o.endsAt.seconds * 1000 : new Date(o.endsAt).getTime());
+    }
+    initReveal();
   } catch (e) { console.error(e); }
+}
+function initReveal() {
+  const els = $$(".reveal");
+  if (!els.length) return;
+  if (!("IntersectionObserver" in window)) { els.forEach(x => x.classList.add("visible")); return; }
+  const io = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("visible"); io.unobserve(entry.target); } }), { threshold: .12 });
+  els.forEach(x => io.observe(x));
 }
 function count(end) { const el = $("#countdown"); if (!el) return; const timer = setInterval(() => { const x = Math.max(0, end - Date.now()); const h = Math.floor(x / 3600000), m = Math.floor(x % 3600000 / 60000), s = Math.floor(x % 60000 / 1000); el.textContent = `${String(h).padStart(2,"0")} : ${String(m).padStart(2,"0")} : ${String(s).padStart(2,"0")}`; if (!x) clearInterval(timer); }, 1000); }
 

@@ -182,18 +182,28 @@ app.post("/api/upload", requireAdmin, upload.array("files", 20), async (req, res
   if (!files.length) return res.status(400).json({ ok: false, error: "لم يتم اختيار أي ملف" });
   try {
     const folder = cleanFolder(req.body.folder || "/axel");
-    const results = [];
-    for (const file of files) {
-      if (!file.mimetype?.startsWith("image/")) return res.status(400).json({ ok: false, error: "مسموح برفع الصور فقط" });
-      const result = await imagekit.upload({
-        file: file.buffer.toString("base64"),
-        fileName: file.originalname,
-        folder,
-        useUniqueFileName: true,
-        tags: ["axel"]
-      });
-      results.push({ url: result.url, fileId: result.fileId, name: result.name, thumbnailUrl: result.thumbnailUrl || result.url });
+    if (files.some(file => !file.mimetype?.startsWith("image/"))) return res.status(400).json({ ok: false, error: "مسموح برفع الصور فقط" });
+
+    // Upload several images concurrently instead of waiting for every image one-by-one.
+    const concurrency = 4;
+    const results = new Array(files.length);
+    let cursor = 0;
+    async function worker() {
+      while (true) {
+        const index = cursor++;
+        if (index >= files.length) return;
+        const file = files[index];
+        const result = await imagekit.upload({
+          file: file.buffer.toString("base64"),
+          fileName: file.originalname,
+          folder,
+          useUniqueFileName: true,
+          tags: ["axel"]
+        });
+        results[index] = { url: result.url, fileId: result.fileId, name: result.name, thumbnailUrl: result.thumbnailUrl || result.url };
+      }
     }
+    await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, worker));
     res.json({ ok: true, files: results });
   } catch (error) {
     console.error("Upload error:", error);

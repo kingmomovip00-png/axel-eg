@@ -1,7 +1,37 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AXEL | إتمام الطلب</title><link rel="stylesheet" href="css/style.css"></head><body><div class="form-wrap"><form id="checkoutForm" class="form-card"><img src="assets/logo/logo.png" class="brand-logo" alt="AXEL"><h2>إتمام الطلب</h2><div id="orderSummary"></div><input id="customerName" required placeholder="الاسم الكامل"><input id="phone" required inputmode="tel" placeholder="رقم الهاتف"><textarea id="address" required placeholder="العنوان بالتفصيل"></textarea><select id="paymentMethod" required><option value="">طريقة الدفع</option><option value="Paymob">بطاقة / بوابة دفع إلكتروني</option><option value="Vodafone Cash">Vodafone Cash</option><option value="InstaPay">InstaPay</option></select><p>الشحن: 50 جنيه</p><button class="btn" id="submitOrder">تأكيد الطلب</button><p id="checkoutMsg"></p></form></div><script type="module">
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AXEL | إتمام الطلب</title><link rel="stylesheet" href="css/style.css"></head>
+<body class="checkout-page">
+<header class="header compact-header"><div class="container nav"><a class="nav-link nav-track-link" href="product.html" id="backTop">رجوع للمنتج</a><a href="index.html"><img src="assets/logo/logo.png" class="brand-logo brand-logo-home" alt="AXEL"></a></div></header>
+<main class="checkout-shell">
+  <section class="checkout-card reveal visible">
+    <div class="checkout-head"><span class="section-kicker">SECURE ORDER</span><h1>إتمام الطلب</h1><p>أدخل بياناتك وسنكمل معك الطلب.</p></div>
+    <div id="orderSummary" class="order-summary"></div>
+    <form id="checkoutForm" class="checkout-form">
+      <div class="form-row compact-row"><input id="customerName" required placeholder="الاسم الكامل"><input id="phone" required inputmode="tel" placeholder="رقم الهاتف"></div>
+      <textarea id="address" required placeholder="العنوان بالتفصيل"></textarea>
+      <select id="paymentMethod" required><option value="">اختر طريقة الدفع</option><option value="Paymob">بطاقة / بوابة دفع إلكتروني</option><option value="Vodafone Cash">Vodafone Cash</option><option value="InstaPay">InstaPay</option></select>
+      <button class="btn checkout-submit" id="submitOrder">تأكيد الطلب</button>
+      <p id="checkoutMsg" class="checkout-msg" aria-live="polite"></p>
+    </form>
+    <div id="orderSuccess" class="order-success hidden"></div>
+  </section>
+
+  <section id="similarSection" class="similar-section hidden">
+    <div class="section-heading"><div><span class="section-kicker">YOU MAY LIKE</span><h2>منتجات مشابهة</h2></div></div>
+    <div id="similarProducts" class="product-grid art-grid"></div>
+  </section>
+  <a id="backButton" class="btn back-button" href="product.html">رجوع</a>
+</main>
+<script type="module">
 import {API_URL,SHIPPING_PRICE} from './js/config.js';
-const q=new URLSearchParams(location.search); const id=q.get('id'), color=q.get('color'), size=q.get('size'), quantity=Math.max(1,Number(q.get('quantity')||1)); let product=null;
-const money=n=>new Intl.NumberFormat('ar-EG',{maximumFractionDigits:0}).format(n||0)+' ج';
-if(id){const r=await fetch(`${API_URL}/products/${encodeURIComponent(id)}`);const d=await r.json();if(r.ok&&d.ok){product=d.product;const total=Number(product.salePrice||0)*quantity+SHIPPING_PRICE;orderSummary.innerHTML=`<h3>${product.name}</h3><p>${color} - ${size}</p><p>الكمية: ${quantity}</p><p>${money(product.salePrice)} × ${quantity} + ${money(SHIPPING_PRICE)} شحن</p><h3>الإجمالي: ${money(total)}</h3>`;}}
-checkoutForm.onsubmit=async e=>{e.preventDefault();if(!product)return checkoutMsg.textContent='المنتج غير موجود';submitOrder.disabled=true;checkoutMsg.textContent='جاري إنشاء الطلب...';try{const r=await fetch(`${API_URL}/orders`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:id,color,size,quantity,customerName:customerName.value,phone:phone.value,address:address.value,paymentMethod:paymentMethod.value})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'فشل الطلب');checkoutMsg.innerHTML=`تم إنشاء طلبك بنجاح. رقم الطلب: <b>${d.orderCode}</b><br>احتفظ بالرقم لتتبع الطلب.`;submitOrder.style.display='none';}catch(err){checkoutMsg.textContent=err.message;}finally{submitOrder.disabled=false;}};
-</script></body></html>
+const $=s=>document.querySelector(s); const q=new URLSearchParams(location.search); const id=q.get('id'), color=q.get('color'), size=q.get('size'), quantity=Math.max(1,Number(q.get('quantity')||1)); let product=null;
+const money=n=>new Intl.NumberFormat('ar-EG',{maximumFractionDigits:0}).format(Number(n||0))+' ج';
+const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const productUrl=id?`product.html?id=${encodeURIComponent(id)}`:'index.html'; $('#backTop').href=productUrl; $('#backButton').href=productUrl;
+function card(p){return `<a class="card art-card" href="product.html?id=${encodeURIComponent(p.id)}"><img loading="lazy" src="${p.images?.[0]?.url||''}" alt="${esc(p.name)}"><div class="card-body"><b>${esc(p.name||'منتج AXEL')}</b><div class="price">${money(p.salePrice)}</div></div></a>`;}
+async function loadSimilar(){try{const r=await fetch(`${API_URL}/products`);const d=await r.json();const list=(d.products||[]).filter(p=>p.id!==id&&(p.category===product?.category||true)).slice(0,4);if(list.length){$('#similarProducts').innerHTML=list.map(card).join('');$('#similarSection').classList.remove('hidden');}}catch{}}
+if(id){try{const r=await fetch(`${API_URL}/products/${encodeURIComponent(id)}`);const d=await r.json();if(r.ok&&d.ok){product=d.product;const total=Number(product.salePrice||0)*quantity+SHIPPING_PRICE;$('#orderSummary').innerHTML=`<div><h3>${esc(product.name)}</h3><p>${esc(color)} • ${esc(size)} • الكمية: ${quantity}</p></div><div class="summary-total"><span>الإجمالي شامل الشحن</span><strong>${money(total)}</strong></div>`;loadSimilar();}}catch{}}
+$('#checkoutForm').onsubmit=async e=>{e.preventDefault();if(!product)return $('#checkoutMsg').textContent='المنتج غير موجود.';const btn=$('#submitOrder');btn.disabled=true;btn.textContent='جاري تأكيد الطلب...';$('#checkoutMsg').textContent='';try{const r=await fetch(`${API_URL}/orders`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:id,color,size,quantity,customerName:$('#customerName').value,phone:$('#phone').value,address:$('#address').value,paymentMethod:$('#paymentMethod').value})});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'فشل إنشاء الطلب');$('#checkoutForm').classList.add('hidden');$('#orderSummary').classList.add('hidden');$('#orderSuccess').classList.remove('hidden');$('#orderSuccess').innerHTML=`<div class="success-mark">✓</div><h2>تم تأكيد طلبك بنجاح</h2><p>احتفظ بكود الطلب لمتابعة حالته.</p><div class="order-code"><code id="orderCode">${esc(d.orderCode)}</code><button type="button" id="copyCode" class="btn">نسخ كود الطلب</button></div><div class="success-actions"><a class="btn" href="track.html">متابعة الطلب</a><a class="btn ghost" href="index.html">العودة للرئيسية</a></div>`;$('#copyCode').onclick=async()=>{try{await navigator.clipboard.writeText(d.orderCode);$('#copyCode').textContent='تم النسخ ✓';setTimeout(()=>$('#copyCode').textContent='نسخ كود الطلب',1600);}catch{$('#copyCode').textContent='انسخ الكود يدويًا';}};}catch(err){$('#checkoutMsg').textContent=err.message;}finally{btn.disabled=false;btn.textContent='تأكيد الطلب';}};
+</script>
+</body></html>
