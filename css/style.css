@@ -42,3 +42,54 @@ body{overflow-x:hidden}
 @media(min-width:901px){.product-rail .product-card{flex-basis:clamp(250px,25vw,315px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .order-summary{display:grid;gap:5px;padding:13px;margin:10px 0 14px;border:1px solid var(--line);border-radius:13px;background:#171716}.order-summary span{color:var(--muted);font-size:13px}.order-summary strong{color:var(--blue);font-size:21px}.checkout-message{min-height:24px;margin-top:12px;text-align:center;font-size:14px}.checkout-actions{display:grid;gap:8px;margin-top:12px}.checkout-actions .btn{text-align:center}.checkout-actions .secondary{background:#171716;color:#fff;border:1px solid var(--line)}
+
+/* =========================================================
+   AXEL STOREFRONT — FINAL RESPONSIVE HARD RESET
+   Keeps the admin UI untouched and guarantees the storefront
+   uses the full device viewport on phones and desktops.
+   ========================================================= */
+.header, main, .footer { width:100%; max-width:none; }
+main > .container, .footer > .container { width:100%; max-width:1180px; margin-inline:auto; }
+.nav { width:100%; max-width:1180px; margin-inline:auto; padding-inline:18px; }
+.hero, .section, .mid-banner, .offer { width:100%; }
+.banner-frame { width:100%; }
+.banner-stage { width:100%; aspect-ratio: 2.35 / 1; height:auto; min-height:0; }
+.banner-stage a, .banner-stage img { width:100%; height:100%; min-height:0; }
+.banner-stage img { object-fit:cover; }
+.product-rail { width:100%; max-width:100%; }
+.product-grid-anime { width:100%; }
+
+/* Prevent any child from creating a page wider than the viewport. */
+main, main *, .footer, .footer * { min-width:0; max-width:100%; }
+.product-rail .product-card { max-width:none; }
+
+@media (max-width:600px){
+  html, body { width:100%; min-width:0; max-width:100%; overflow-x:hidden; }
+  .container, main > .container, .footer > .container {
+    width:100% !important;
+    max-width:none !important;
+    margin-inline:0 !important;
+    padding-inline:16px !important;
+  }
+  .nav { width:100% !important; max-width:none !important; padding-inline:12px !important; }
+  .hero { margin:14px 0 24px; }
+  .banner-frame { border-radius:14px; }
+  .banner-stage { aspect-ratio: 1.72 / 1; height:auto; min-height:0; }
+  .section { padding:22px 0; }
+  .section-heading { width:100%; }
+  .product-rail {
+    width:calc(100% + 32px);
+    margin-inline:-16px;
+    padding-inline:16px;
+    gap:12px;
+    overscroll-behavior-inline:contain;
+  }
+  .product-rail .product-card { flex:0 0 76vw; width:76vw; }
+  .product-grid-anime { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .footer { width:100%; }
+}
+
+@media (min-width:601px){
+  .banner-stage { aspect-ratio:2.45 / 1; }
+  .product-rail .product-card { flex:0 0 clamp(240px,25vw,310px); }
+}

@@ -45,18 +45,84 @@ function setupBanners(banners) {
 }
 
 function setupRail(id) {
-  const el = document.getElementById(id); if (!el) return;
-  let timer;
-  const step = () => Math.max(220, Math.round(el.clientWidth * .72));
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  let timer = null;
+  let resumeTimer = null;
+  let dragging = false;
+  let startX = 0;
+  let startScroll = 0;
+
+  const step = () => Math.max(220, Math.round(el.clientWidth * 0.72));
   const move = dir => el.scrollBy({ left: dir * step(), behavior: "smooth" });
-  $$(`.slider-btn[data-slider="${id}"]`).forEach(btn => btn.addEventListener("click", () => move(btn.dataset.dir === "next" ? -1 : 1)));
-  const start = () => { clearInterval(timer); timer = setInterval(() => { if (document.visibilityState === "visible") { const max = el.scrollWidth - el.clientWidth; const atEnd = Math.abs(el.scrollLeft) >= max - 4 || Math.abs(el.scrollLeft) < 4 && getComputedStyle(el).direction === "ltr"; move(atEnd ? 1 : -1); } }, 4500); };
-  const stop = () => clearInterval(timer);
-  el.addEventListener("pointerdown", stop); el.addEventListener("pointerup", start); el.addEventListener("mouseleave", start); el.addEventListener("focusin", stop); el.addEventListener("focusout", start);
-  el.addEventListener("wheel", e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); el.scrollLeft += e.deltaY; } }, { passive:false });
+
+  $$(`.slider-btn[data-slider="${id}"]`).forEach(btn => {
+    btn.addEventListener("click", () => {
+      pause();
+      move(btn.dataset.dir === "next" ? -1 : 1);
+      resumeSoon();
+    });
+  });
+
+  function pause() {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  function resumeSoon() {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(start, 2500);
+  }
+
+  function start() {
+    pause();
+    if (el.scrollWidth <= el.clientWidth + 8) return;
+    timer = setInterval(() => {
+      if (document.visibilityState !== "visible" || dragging) return;
+      const max = Math.max(0, el.scrollWidth - el.clientWidth);
+      const current = Math.abs(el.scrollLeft);
+      const atEnd = current >= max - 6;
+      move(atEnd ? 1 : -1);
+    }, 4500);
+  }
+
+  el.addEventListener("pointerdown", e => {
+    dragging = true;
+    pause();
+    startX = e.clientX;
+    startScroll = el.scrollLeft;
+    el.setPointerCapture?.(e.pointerId);
+  });
+
+  el.addEventListener("pointermove", e => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    el.scrollLeft = startScroll - dx;
+  });
+
+  el.addEventListener("pointerup", e => {
+    dragging = false;
+    el.releasePointerCapture?.(e.pointerId);
+    resumeSoon();
+  });
+  el.addEventListener("pointercancel", () => { dragging = false; resumeSoon(); });
+  el.addEventListener("mouseenter", pause);
+  el.addEventListener("mouseleave", () => { if (!dragging) resumeSoon(); });
+  el.addEventListener("focusin", pause);
+  el.addEventListener("focusout", resumeSoon);
+
+  el.addEventListener("wheel", e => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      pause();
+      el.scrollLeft += e.deltaY;
+      resumeSoon();
+    }
+  }, { passive:false });
+
   start();
 }
-
 function observeReveals() {
   const io = new IntersectionObserver(entries => entries.forEach(e => { if(e.isIntersecting){e.target.classList.add("is-visible");io.unobserve(e.target);}}), {threshold:.08});
   $$(".reveal-section,.reveal-card").forEach(x => io.observe(x));
