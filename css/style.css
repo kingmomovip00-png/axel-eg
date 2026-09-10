@@ -197,3 +197,82 @@ main, main *, .footer, .footer * { min-width:0; max-width:100%; }
  .payment-option{min-height:70px;flex-direction:row;justify-content:flex-start;padding:10px 14px}
  .payment-icon{width:82px;flex:0 0 82px}
 }
+
+/* ================= AXEL FINAL V13 STOREFRONT FIXES ================= */
+.nav-icon-link{display:flex!important;align-items:center!important;justify-content:center;gap:8px;height:32px}
+.nav-icon-link img{width:18px!important;height:18px!important;min-width:18px;min-height:18px;display:block;object-fit:contain!important;flex:0 0 18px!important}
+
+/* Smaller first horizontal rail */
+.product-rail{gap:12px!important;padding:3px 2px 12px!important}
+.product-rail .product-card{flex:0 0 clamp(175px,22vw,245px)!important}
+.product-rail .card-media{aspect-ratio:4/5!important}
+
+/* Mixed designs + anime grid: always visible and distinct */
+.product-grid-mixed{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.product-grid-mixed .card:first-child{grid-column:span 2;grid-row:span 2}
+.product-grid-mixed .card:first-child .card-media{aspect-ratio:1/1!important}
+.product-grid-mixed .card-media{aspect-ratio:4/5!important}
+.product-grid-anime{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+.product-grid-anime .card-media{aspect-ratio:4/5!important}
+
+/* Never distort/crop product photography */
+.card-media img{width:100%!important;height:100%!important;object-fit:contain!important;object-position:center!important;background:#111}
+.product-main{aspect-ratio:4/5!important;object-fit:contain!important}
+.thumb img{object-fit:contain!important}
+
+/* Checkout + tracking: centered, compact, structured */
+.checkout-page,.track-page{min-height:100vh;background:radial-gradient(circle at 50% 20%,#3caeb812,transparent 38%),#1d1d1b}
+.checkout-page .form-wrap,.track-page .form-wrap{min-height:100vh;width:100%;display:flex!important;align-items:center!important;justify-content:center!important;padding:28px 16px!important}
+.checkout-page .form-card,.track-page .form-card{width:min(560px,100%)!important;margin:0 auto!important;max-height:calc(100vh - 40px);overflow:auto}
+.checkout-card{padding:22px!important}
+.track-card{width:min(480px,100%)!important;padding:22px!important}
+.checkout-head{text-align:center;margin-bottom:18px}
+.checkout-head .brand-logo{height:48px!important;margin:0 auto 8px!important}
+.checkout-head h1{font-size:24px;margin:0;color:var(--text)}
+.checkout-head p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.checkout-section{padding:15px 0;border-top:1px solid var(--line)}
+.checkout-section h3{font-size:16px;color:var(--blue);margin:0 0 12px}
+.checkout-section .form-row{margin-bottom:0}
+.checkout-section input,.checkout-section textarea{margin-top:6px}
+.payment-methods{display:grid;gap:9px}
+.payment-option{display:flex;align-items:center;gap:11px;width:100%;min-height:64px;padding:10px 12px;border:1px solid #ffffff1f;border-radius:13px;background:#171716;cursor:pointer;transition:.2s}
+.payment-option:hover{border-color:#3caeb880;transform:translateY(-1px)}
+.payment-option:has(input:checked){border-color:var(--blue);background:#3caeb80d;box-shadow:0 0 0 1px #3caeb825}
+.payment-option input{width:17px;height:17px;margin:0;accent-color:var(--blue);flex:0 0 17px}
+.payment-copy{display:grid;gap:1px;flex:1}
+.payment-copy b{font-size:14px;color:var(--text)}
+.payment-copy small{font-size:11px;color:var(--muted)}
+.payment-icons{display:flex;align-items:center;gap:5px;direction:ltr;flex:0 0 auto}
+.payment-icons img{width:39px!important;height:26px!important;object-fit:contain!important;background:#fff;border-radius:5px;padding:2px}
+.payment-icons.cards img{width:38px!important}
+.cod-icon{width:38px;height:26px;border:1px solid #ffffff30;border-radius:5px;display:grid;place-items:center;color:var(--blue);font-size:10px;background:#111}
+.checkout-total{display:flex;justify-content:space-between;align-items:center;padding:14px 2px;font-size:14px;border-top:1px solid var(--line)}
+.checkout-total b{color:var(--blue);font-size:22px}
+.checkout-submit{width:100%;background:var(--blue)!important;color:#111!important;border-color:var(--blue)!important;font-weight:800;padding:13px!important}
+.checkout-message{margin-top:10px;text-align:center;font-size:13px;color:var(--blue)}
+.checkout-message.error,.track-result.error{color:#ffadb3}
+.checkout-actions{display:grid;gap:8px;margin-top:12px}
+.checkout-actions .btn,.full-btn{width:100%;text-align:center}
+.secondary{background:#171716!important}
+.track-result{margin-top:14px}
+.track-box{display:grid;gap:1px;background:#171716;border:1px solid var(--line);border-radius:13px;overflow:hidden;text-align:right}
+.track-box div{display:flex;justify-content:space-between;gap:15px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.track-box div:last-child{border-bottom:0}
+.track-box span{color:var(--muted);font-size:12px}
+.track-box b{font-size:13px;text-align:left}
+@media(max-width:800px){
+ .product-grid-mixed{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .product-grid-mixed .card:first-child{grid-column:1/-1;grid-row:auto}
+ .product-grid-mixed .card:first-child .card-media{aspect-ratio:16/10!important}
+ .product-grid-anime{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .product-rail .product-card{flex-basis:clamp(165px,43vw,205px)!important}
+}
+@media(max-width:520px){
+ .checkout-page .form-wrap,.track-page .form-wrap{padding:14px!important}
+ .checkout-page .form-card,.track-page .form-card{max-height:calc(100vh - 28px)}
+ .checkout-card,.track-card{padding:17px!important}
+ .checkout-head .brand-logo{height:42px!important}
+ .payment-option{min-height:59px;padding:9px}
+ .payment-icons img{width:34px!important;height:23px!important}
+ .product-rail .product-card{flex-basis:43vw!important}
+}

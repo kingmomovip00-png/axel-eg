@@ -137,8 +137,8 @@ async function home() {
     const anime = shuffled.filter(p => p.category === "أنمي");
     const dEl = $("#productsDesigns"), mEl = $("#productsMixed"), aEl = $("#productsAnime");
     if (dEl) dEl.innerHTML = designs.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
-    const mixed = shuffle([...(products || [])]);
-    if (mEl) mEl.innerHTML = mixed.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
+    const mixed = shuffle([...(products || [])]).filter(p => Array.isArray(p.images) && p.images.some(x => x?.url));
+    if (mEl) { const mixedSource = mixed.length ? mixed : shuffle([...(products || [])]); mEl.innerHTML = mixedSource.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`; }
     if (aEl) aEl.innerHTML = anime.map(card).join("") || `<p class="empty-state">لا توجد تصميمات أنمي حالياً</p>`;
     setupBanners(banners || []);
     if (offers?.length && $("#offer")) { const o=offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent=o.title||"عرض محدود"; count(o.endsAt?.seconds ? o.endsAt.seconds*1000 : new Date(o.endsAt).getTime()); }

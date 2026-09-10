@@ -19,3 +19,27 @@ APP_URL=https://رابط-موقع-AXEL-النهائي
 5) نجاح الدفع لا يُعتبر مؤكدًا بمجرد رجوع العميل؛ السيرفر يتحقق من Webhook وHMAC ثم يحدّث حالة الطلب.
 
 لا تحتاج إلى تعديل الكود عند تفعيل الحساب؛ المطلوب فقط إدخال القيم السابقة في Environment Variables.
+
+
+========================
+إعداد Paymob في Bonto
+========================
+الكود الخاص بالدفع الإلكتروني جاهز بالفعل. لا تعدل server.js أو checkout.html.
+بعد تفعيل حساب Paymob، أضف القيم التالية في Bonto > Environment Variables:
+
+PAYMOB_BASE_URL=https://accept.paymob.com
+PAYMOB_SECRET_KEY=ضع Secret Key هنا
+PAYMOB_PUBLIC_KEY=ضع Public Key هنا
+PAYMOB_HMAC_SECRET=ضع HMAC Secret هنا
+PAYMOB_INTEGRATION_ID_CARD=ضع Integration ID الخاص بالدفع بالبطاقات هنا
+APP_URL=https://رابط-موقع-AXEL-النهائي
+
+ثم اعمل Restart للتطبيق.
+
+مهم:
+- لا تضع أي مفتاح داخل ملفات الموقع.
+- لا ترسل المفاتيح في المحادثة.
+- استخدم بيانات Live عندما يكون الموقع جاهزًا للبيع الحقيقي.
+- رابط Webhook الذي يستخدمه الموقع هو:
+  /api/paymob/webhook
+- رابط العودة بعد الدفع يتم إنشاؤه تلقائيًا بواسطة الكود.
