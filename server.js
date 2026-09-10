@@ -128,32 +128,10 @@ function splitCustomerName(name) {
 }
 
 async function notifyTelegram(order) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
-  const text = [
-    "🛍️ طلب جديد - AXEL",
-    `رقم الطلب: ${order.orderCode}`,
-    `العميل: ${order.customerName}`,
-    `الهاتف: ${order.phone}`,
-    `المنتج: ${order.productName}`,
-    `اللون: ${order.color}`,
-    `المقاس: ${order.size}`,
-    `الكمية: ${order.quantity}`,
-    `الإجمالي: ${order.total} جنيه`,
-    `طريقة الدفع: ${order.paymentMethod}`,
-    `حالة الدفع: ${order.paymentStatus}`,
-    `العنوان: ${order.address}`
-  ].join("\n");
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text })
-    });
-  } catch (error) {
-    console.error("Telegram notification failed:", error.message);
-  }
+  const text = ["🛍️ طلب جديد - AXEL",`رقم الطلب: ${order.orderCode}`,`العميل: ${order.customerName}`,`الهاتف: ${order.phone}`,`المنتج: ${order.productName}`,`اللون: ${order.color}`,`المقاس: ${order.size}`,`الكمية: ${order.quantity}`,`الإجمالي: ${order.total} جنيه`,`طريقة الدفع: ${order.paymentMethod}`,`حالة الدفع: ${order.paymentStatus}`,`العنوان: ${order.address}`].join("\n");
+  try { const imageUrl=String(order.imageUrl||"").trim(); const endpoint=imageUrl?"sendPhoto":"sendMessage"; const body=imageUrl?{chat_id:chatId,photo:imageUrl,caption:text}:{chat_id:chatId,text}; await fetch(`https://api.telegram.org/bot${token}/${endpoint}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); } catch(error){ console.error("Telegram notification failed:",error.message); }
 }
 
 app.get("/api/health", (req, res) => {
@@ -418,7 +396,7 @@ app.post("/api/paymob/checkout", async (req, res) => {
       console.error("Paymob intention error", r.status, data);
       return res.status(502).json({ ok: false, error: "تعذر إنشاء عملية الدفع من Paymob. راجع بيانات Paymob وحالة Integration ID." });
     }
-    await ref.update({ paymobIntentionId: data.id || null, paymentStatus: "pending", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    await ref.update({ paymobIntentionId: data.id || null, paymobOrderId: data.intention_order_id || data.order_id || null, paymentStatus: "pending", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     const checkoutUrl = `${base}/unifiedcheckout/?publicKey=${encodeURIComponent(process.env.PAYMOB_PUBLIC_KEY)}&clientSecret=${encodeURIComponent(data.client_secret)}`;
     res.json({ ok: true, checkoutUrl });
   } catch (error) {
@@ -494,11 +472,13 @@ app.post("/api/paymob/webhook", async (req, res) => {
   const obj = req.body?.obj;
   const receivedHmac = String(req.query?.hmac || "");
   if (!verifyPaymobHmac(obj, receivedHmac)) return res.status(401).json({ ok: false, error: "Invalid Paymob HMAC" });
-  const merchantOrderId = String(obj?.order?.merchant_order_id || "").trim();
-  if (!merchantOrderId) return res.status(400).json({ ok: false, error: "Paymob order reference missing" });
-  try {
-    const snap = await db.collection("orders").where("orderCode", "==", merchantOrderId).limit(1).get();
-    if (snap.empty) return res.status(404).json({ ok: false, error: "AXEL order not found" });
+   const merchantOrderId=String(obj?.order?.merchant_order_id||"").trim();
+   const paymobOrderId=String(obj?.order?.id||"").trim();
+   if(!merchantOrderId&&!paymobOrderId)return res.status(400).json({ok:false,error:"Paymob order reference missing"});
+   try {
+     let snap=merchantOrderId?await db.collection("orders").where("orderCode","==",merchantOrderId).limit(1).get():{empty:true,docs:[]};
+     if(snap.empty&&paymobOrderId){ snap=await db.collection("orders").where("paymobOrderId","==",Number(paymobOrderId)).limit(1).get(); if(snap.empty)snap=await db.collection("orders").where("paymobOrderId","==",paymobOrderId).limit(1).get(); }
+     if(snap.empty)return res.status(404).json({ok:false,error:"AXEL order not found"});
     const orderRef = snap.docs[0].ref;
     const current = snap.docs[0].data();
     const success = obj.success === true && obj.pending === false;
