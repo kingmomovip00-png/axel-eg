@@ -185,6 +185,15 @@ app.get("/api/offers", async (req, res) => {
   }
 });
 
+app.get("/api/banners/:id", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  try {
+    const snap = await db.collection("banners").doc(req.params.id).get();
+    if (!snap.exists || snap.data().active === false) return res.status(404).json({ ok: false, error: "البانر غير موجود" });
+    res.json({ ok: true, banner: serializeDoc(snap) });
+  } catch { res.status(500).json({ ok: false, error: "فشل تحميل البانر" }); }
+});
+
 // ---------- ADMIN IMAGE UPLOAD ----------
 app.post("/api/upload", requireAdmin, upload.array("files", 20), async (req, res) => {
   if (!isImageKitConfigured()) return res.status(503).json({ ok: false, error: "ImageKit غير مُعد" });
@@ -245,6 +254,8 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
       salePrice,
       oldPrice: Number(body.oldPrice || 0),
       description: String(body.description || ""),
+      offerPrice: Number(body.offerPrice || 0),
+      offerColor: String(body.offerColor || ""),
       images,
       colors,
       sizes,
@@ -264,7 +275,7 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     const ref = db.collection("products").doc(req.params.id);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ ok: false, error: "المنتج غير موجود" });
-    const allowed = ["name", "category", "salePrice", "oldPrice", "description", "images", "colors", "sizes", "stock", "active"];
+    const allowed = ["name", "category", "salePrice", "oldPrice", "description", "offerPrice", "offerColor", "images", "colors", "sizes", "stock", "active"];
     const patch = {};
     for (const key of allowed) if (key in (req.body || {})) patch[key] = req.body[key];
     patch.updatedAt = admin.firestore.FieldValue.serverTimestamp();
@@ -296,9 +307,12 @@ app.get("/api/admin/banners", requireAdmin, async (req, res) => {
   res.json({ ok: true, banners: snap.docs.map(serializeDoc) });
 });
 app.post("/api/admin/banners", requireAdmin, async (req, res) => {
-  const { imageUrl, fileId } = req.body || {};
+  const { imageUrl, fileId, productId, offerPrice, offerColor } = req.body || {};
   if (!imageUrl) return res.status(400).json({ ok: false, error: "ارفع البانر أولاً" });
-  const ref = await db.collection("banners").add({ imageUrl, fileId: fileId || "", active: true, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  const price = Number(offerPrice || 0);
+  if (productId && price <= 0) return res.status(400).json({ ok: false, error: "أدخل سعر العرض للمنتج المرتبط بالبانر" });
+  if (productId) { const p = await db.collection("products").doc(String(productId)).get(); if (!p.exists) return res.status(400).json({ ok: false, error: "المنتج المرتبط بالبانر غير موجود" }); }
+  const ref = await db.collection("banners").add({ imageUrl, fileId: fileId || "", productId: productId || "", offerPrice: price, offerColor: String(offerColor || ""), active: true, createdAt: admin.firestore.FieldValue.serverTimestamp() });
   res.status(201).json({ ok: true, id: ref.id });
 });
 app.patch("/api/admin/banners/:id", requireAdmin, async (req, res) => {
@@ -320,10 +334,48 @@ app.post("/api/admin/offers", requireAdmin, async (req, res) => {
   res.status(201).json({ ok: true, id: ref.id });
 });
 
+// ---------- COUPONS ----------
+app.get("/api/coupons/validate", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  const code = String(req.query.code || "").trim().toUpperCase();
+  const subtotal = Math.max(0, Number(req.query.subtotal || 0));
+  if (!code) return res.status(400).json({ ok: false, error: "اكتب كود الخصم" });
+  try {
+    const snap = await db.collection("coupons").doc(code).get();
+    if (!snap.exists) return res.status(404).json({ ok: false, error: "كود الخصم غير صحيح" });
+    const c = snap.data(); const now = Date.now();
+    if (c.active === false || (c.expiresAt && new Date(c.expiresAt.toDate ? c.expiresAt.toDate() : c.expiresAt).getTime() < now) || (Number(c.usageLimit || 0) > 0 && Number(c.usedCount || 0) >= Number(c.usageLimit))) return res.status(400).json({ ok: false, error: "كود الخصم غير متاح حالياً" });
+    if (subtotal < Number(c.minOrder || 0)) return res.status(400).json({ ok: false, error: `الحد الأدنى للطلب لاستخدام الكود هو ${Number(c.minOrder || 0)} ج` });
+    let discount = c.type === "fixed" ? Math.min(subtotal, Number(c.value || 0)) : subtotal * Math.min(100, Number(c.value || 0)) / 100;
+    if (Number(c.maxDiscount || 0) > 0) discount = Math.min(discount, Number(c.maxDiscount));
+    discount = Math.max(0, Math.round(discount * 100) / 100);
+    res.json({ ok: true, coupon: { code, type: c.type, value: Number(c.value || 0), discount, minOrder: Number(c.minOrder || 0), maxDiscount: Number(c.maxDiscount || 0) } });
+  } catch { res.status(500).json({ ok: false, error: "تعذر التحقق من الكود" }); }
+});
+
+app.get("/api/products/:id/reviews", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  try { const snap = await db.collection("reviews").where("productId", "==", req.params.id).where("approved", "==", true).get(); const reviews=snap.docs.map(serializeDoc).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0)); res.json({ok:true,reviews}); } catch { res.status(500).json({ok:false,error:"تعذر تحميل التقييمات"}); }
+});
+app.get("/api/reviews", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  try { const snap = await db.collection("reviews").where("approved", "==", true).get(); const reviews=snap.docs.map(serializeDoc).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0)).slice(0,50); res.json({ok:true,reviews}); } catch { res.status(500).json({ok:false,error:"تعذر تحميل التقييمات"}); }
+});
+app.post("/api/reviews", async (req,res)=>{
+  if(!requireFirebase(res))return; const {productId,name,rating,comment}=req.body||{}; const r=Math.round(Number(rating||0)); if(!productId||!String(name||'').trim()||r<1||r>5||!String(comment||'').trim()) return res.status(400).json({ok:false,error:"اكتب الاسم والتقييم والرأي"});
+  try { const p=await db.collection("products").doc(String(productId)).get(); if(!p.exists||p.data().active===false)return res.status(404).json({ok:false,error:"المنتج غير موجود"}); await db.collection("reviews").add({productId:String(productId),productName:p.data().name||"منتج AXEL",name:String(name).trim().slice(0,80),rating:r,comment:String(comment).trim().slice(0,800),approved:true,createdAt:admin.firestore.FieldValue.serverTimestamp()}); res.status(201).json({ok:true,message:"تم إضافة رأيك بنجاح"}); } catch { res.status(500).json({ok:false,error:"تعذر حفظ الرأي"}); }
+});
+
+// ---------- ADMIN COUPONS ----------
+app.get("/api/admin/coupons", requireAdmin, async (req,res)=>{ const snap=await db.collection("coupons").get(); res.json({ok:true,coupons:snap.docs.map(serializeDoc)}); });
+app.post("/api/admin/coupons", requireAdmin, async (req,res)=>{ const b=req.body||{}, code=String(b.code||'').trim().toUpperCase(), type=b.type==='fixed'?'fixed':'percent', value=Number(b.value||0); if(!code||!/^[A-Z0-9_-]{3,30}$/.test(code)||value<=0)return res.status(400).json({ok:false,error:"أدخل كودًا صحيحًا وقيمة الخصم"}); const ref=db.collection("coupons").doc(code); if((await ref.get()).exists)return res.status(400).json({ok:false,error:"كود الخصم موجود بالفعل"}); await ref.set({code,type,value,minOrder:Number(b.minOrder||0),maxDiscount:Number(b.maxDiscount||0),usageLimit:Number(b.usageLimit||0),usedCount:0,expiresAt:b.expiresAt?new Date(b.expiresAt):null,active:b.active!==false,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()}); res.status(201).json({ok:true}); });
+app.patch("/api/admin/coupons/:id", requireAdmin, async (req,res)=>{ const patch={},b=req.body||{}; for(const k of ['type','value','minOrder','maxDiscount','usageLimit','active']) if(k in b) patch[k]=k==='type'?(b[k]==='fixed'?'fixed':'percent'):k==='active'?Boolean(b[k]):Number(b[k]||0); if('expiresAt' in b)patch.expiresAt=b.expiresAt?new Date(b.expiresAt):null; patch.updatedAt=admin.firestore.FieldValue.serverTimestamp(); await db.collection('coupons').doc(String(req.params.id).toUpperCase()).update(patch); res.json({ok:true}); });
+app.delete("/api/admin/coupons/:id", requireAdmin, async (req,res)=>{ await db.collection('coupons').doc(String(req.params.id).toUpperCase()).delete(); res.json({ok:true}); });
+
 // ---------- ORDERS ----------
 app.post("/api/orders", async (req, res) => {
   if (!requireFirebase(res)) return;
-  const { productId, color, size, quantity = 1, customerName, phone, email, address, paymentMethod = "غير محدد" } = req.body || {};
+  const { productId, color, size, quantity = 1, customerName, phone, email, address, paymentMethod = "غير محدد", couponCode = "", bannerId = "" } = req.body || {};
   const qty = Math.max(1, Math.min(10, Number(quantity) || 1));
   if (!productId || !color || !size || !customerName || !phone || !email || !address) return res.status(400).json({ ok: false, error: "أكمل الاسم والهاتف والبريد الإلكتروني والعنوان واختيارات المنتج" });
   try {
@@ -342,13 +394,37 @@ app.post("/api/orders", async (req, res) => {
       nextStock[color][size] = available - qty;
       tx.update(productRef, { stock: nextStock, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
       const shipping = Number(process.env.SHIPPING_PRICE || 50);
-      const subtotal = Number(product.salePrice || 0) * qty;
+      let unitPrice = Number(product.salePrice || 0);
+      let offerApplied = false;
+      if (bannerId) {
+        const bs = await tx.get(db.collection("banners").doc(String(bannerId)));
+        const b = bs.exists ? bs.data() : null;
+        if (!b || b.active === false || String(b.productId || "") !== String(productId) || Number(b.offerPrice || 0) <= 0) throw new Error("INVALID_BANNER_OFFER");
+        unitPrice = Number(b.offerPrice); offerApplied = true;
+      }
+      let subtotal = unitPrice * qty;
+      let discount = 0; let appliedCoupon = "";
+      if (couponCode) {
+        const code = String(couponCode).trim().toUpperCase();
+        const cs = await tx.get(db.collection("coupons").doc(code));
+        if (!cs.exists) throw new Error("COUPON_INVALID");
+        const c = cs.data(); const now = Date.now();
+        if (c.active === false || (c.expiresAt && new Date(c.expiresAt.toDate ? c.expiresAt.toDate() : c.expiresAt).getTime() < now) || (Number(c.usageLimit || 0) > 0 && Number(c.usedCount || 0) >= Number(c.usageLimit))) throw new Error("COUPON_INVALID");
+        if (subtotal < Number(c.minOrder || 0)) throw new Error("COUPON_MIN_ORDER");
+        discount = c.type === "fixed" ? Math.min(subtotal, Number(c.value || 0)) : subtotal * Math.min(100, Number(c.value || 0)) / 100;
+        if (Number(c.maxDiscount || 0) > 0) discount = Math.min(discount, Number(c.maxDiscount));
+        discount = Math.max(0, Math.round(discount * 100) / 100); appliedCoupon = code;
+        tx.update(cs.ref, { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+      }
+      const finalTotal = Math.max(0, subtotal - discount + shipping);
       orderData = {
         orderCode, productId, productName: product.name || "منتج AXEL",
         imageUrl: product.images?.find(x => x.color === color)?.url || product.images?.[0]?.url || "",
         color, size, quantity: qty,
+        unitPrice, offerApplied, bannerId: String(bannerId || ""),
+        couponCode: appliedCoupon, discount,
         customerName: String(customerName).trim(), phone: String(phone).trim(), email: String(email).trim().toLowerCase(), address: String(address).trim(),
-        paymentMethod, paymentStatus: "pending", status: "جديد", subtotal, shipping, total: subtotal + shipping,
+        paymentMethod, paymentStatus: "pending", status: "جديد", subtotal, shipping, total: finalTotal,
         createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
       const ref = db.collection("orders").doc(); tx.set(ref, orderData); return ref;
@@ -356,7 +432,7 @@ app.post("/api/orders", async (req, res) => {
     await notifyTelegram({ ...orderData, id: orderRef.id });
     res.status(201).json({ ok: true, orderId: orderRef.id, orderCode, total: orderData.total, paymentStatus: orderData.paymentStatus });
   } catch (error) {
-    const map = { PRODUCT_NOT_FOUND: "المنتج غير موجود", PRODUCT_INACTIVE: "هذا المنتج غير متاح حالياً", OUT_OF_STOCK: "الكمية المطلوبة غير متاحة" };
+    const map = { PRODUCT_NOT_FOUND: "المنتج غير موجود", PRODUCT_INACTIVE: "هذا المنتج غير متاح حالياً", OUT_OF_STOCK: "الكمية المطلوبة غير متاحة", INVALID_BANNER_OFFER: "العرض المرتبط بالبانر غير صالح", COUPON_INVALID: "كود الخصم غير صالح أو منتهي أو استنفد عدد استخداماته", COUPON_MIN_ORDER: "الحد الأدنى لاستخدام كود الخصم لم يتحقق" };
     res.status(400).json({ ok: false, error: map[error.message] || "فشل إنشاء الطلب" });
   }
 });
@@ -493,6 +569,7 @@ app.post("/api/paymob/webhook", async (req, res) => {
       else if (failed && order.paymentStatus !== "failed") {
         patch.paymentStatus = "failed"; patch.status = "ملغي";
         if (!order.stockRestored) {
+          if (order.couponCode) { const couponRef=db.collection("coupons").doc(String(order.couponCode).toUpperCase()); const couponSnap=await tx.get(couponRef); if(couponSnap.exists) tx.update(couponRef,{usedCount:admin.firestore.FieldValue.increment(-1),updatedAt:admin.firestore.FieldValue.serverTimestamp()}); }
           const productRef = db.collection("products").doc(order.productId);
           const productSnap = await tx.get(productRef);
           if (productSnap.exists) {
@@ -515,7 +592,7 @@ app.post("/api/paymob/webhook", async (req, res) => {
   }
 });
 
-app.use(express.static(__dirname, { index: "index.html", extensions: ["html"] }));
+app.use(express.static(__dirname, { index: "index.html", extensions: ["html"], setHeaders(res){ res.setHeader("Cache-Control", "no-cache, must-revalidate"); } }));
 app.get("*", (req, res) => {
   if (req.path.startsWith("/api/")) return res.status(404).json({ ok: false, error: "API endpoint غير موجود" });
   res.sendFile(path.join(__dirname, "index.html"));

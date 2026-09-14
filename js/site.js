@@ -30,7 +30,7 @@ function renderBanner(target, banner, index) {
   if (!target) return;
   if (!banner?.imageUrl) { target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`; return; }
   target.classList.remove("banner-enter"); void target.offsetWidth; target.classList.add("banner-enter");
-  target.innerHTML = `<a href="${banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs"}" aria-label="عرض AXEL"><img src="${escapeHtml(banner.imageUrl)}" alt="AXEL" decoding="async"></a>`;
+  target.innerHTML = `<a href="${banner.productId && banner.offerPrice ? `banner-offer.html?banner=${encodeURIComponent(banner.id)}` : (banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs")}" aria-label="عرض AXEL"><img src="${escapeHtml(banner.imageUrl)}" alt="AXEL" decoding="async"></a>`;
   const dots = target.parentElement?.querySelector(".banner-dots");
   if (dots) dots.innerHTML = "";
 }
@@ -150,20 +150,28 @@ function count(end) { const el=$("#countdown"); if(!el||!Number.isFinite(end))re
 
 function showToast(msg, error=false) { const el=$("#siteToast"); if(!el)return; el.textContent=msg; el.classList.toggle("error",!!error); el.classList.remove("hidden"); clearTimeout(showToast.t); showToast.t=setTimeout(()=>el.classList.add("hidden"),4000); }
 
-async function product() {
-  const id=new URLSearchParams(location.search).get("id"); if(!id||!$("#pname"))return;
-  try {
-    const {product:p}=await publicApi(`/products/${encodeURIComponent(id)}`);
-    const images=p.images||[]; let color=(p.colors||[images[0]?.color]).find(Boolean)||""; let size=(p.sizes||[])[0]||"M"; let quantity=1;
-    $("#pname").textContent=p.name||"منتج AXEL"; $("#pdesc").textContent=p.description||"Oversize T-shirt"; $("#pprice").textContent=money(p.salePrice);
-    const gallery=$("#gallery");
-    function render(){const colorImages=images.filter(x=>x.color===color);const list=colorImages.length?shuffle(colorImages):shuffle(images);const main=list[0];$("#pimage").src=main?.url||"";if(gallery)gallery.innerHTML=list.map((im,i)=>`<button class="thumb ${i===0?"active":""}" data-img-url="${escapeHtml(im.url)}" type="button"><img loading="lazy" src="${escapeHtml(im.url)}" alt="${escapeHtml(p.name)}"></button>`).join("");const colors=p.colors?.length?p.colors:[...new Set(images.map(x=>x.color).filter(Boolean))];$("#colors").innerHTML=colors.map(c=>`<button type="button" class="option ${c===color?"active":""}" data-color="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");$("#sizes").innerHTML=(p.sizes||["M","L","XL","XXL"]).map(z=>{const q=Number(p.stock?.[color]?.[z]||0);return `<button type="button" class="option ${z===size?"active":""} ${q<=0?"sold-out":""}" data-size="${escapeHtml(z)}" ${q<=0?"disabled":""}>${escapeHtml(z)}</button>`}).join("");const available=Number(p.stock?.[color]?.[size]||0);if(available<=0){const next=(p.sizes||[]).find(z=>Number(p.stock?.[color]?.[z]||0)>0);if(next&&next!==size){size=next;return render();}}$("#stock").textContent=available?`المتاح: ${available} قطعة`:"نفذت الكمية";$("#quantityValue").textContent=quantity;$("#buy").disabled=!available;}
-    $("#colors").onclick=e=>{const b=e.target.closest("[data-color]");if(b){color=b.dataset.color;const n=(p.sizes||[]).find(z=>Number(p.stock?.[color]?.[z]||0)>0);if(n)size=n;quantity=1;render();}};
-    $("#sizes").onclick=e=>{const b=e.target.closest("[data-size]");if(b&&!b.disabled){size=b.dataset.size;quantity=1;render();}};
-    gallery?.addEventListener("click",e=>{const b=e.target.closest("[data-img-url]");if(!b)return;$("#pimage").src=b.dataset.imgUrl;$$('.thumb',gallery).forEach(x=>x.classList.remove("active"));b.classList.add("active");});
-    $("#qtyMinus").onclick=()=>{quantity=Math.max(1,quantity-1);render()};$("#qtyPlus").onclick=()=>{const max=Number(p.stock?.[color]?.[size]||0);quantity=Math.min(max||1,quantity+1);render()};$("#buy").onclick=()=>location.href=`checkout.html?id=${encodeURIComponent(id)}&color=${encodeURIComponent(color)}&size=${encodeURIComponent(size)}&quantity=${quantity}`;
-    render();
-  } catch(e) { $("#pname").textContent=e.message||"تعذر تحميل المنتج"; }
+async function loadReviews(productId){
+  const [{reviews:pr=[]},{reviews:all=[]}]=await Promise.all([publicApi(`/products/${encodeURIComponent(productId)}/reviews`),publicApi('/reviews')]);
+  const render=(list,target)=>{if(!target)return;target.innerHTML=list.length?list.map(r=>`<article class="review-card"><div class="review-top"><b>${escapeHtml(r.name||'عميل AXEL')}</b><span class="stars">${'★'.repeat(Number(r.rating||0))}${'☆'.repeat(5-Number(r.rating||0))}</span></div><p>${escapeHtml(r.comment||'')}</p><small>تجربة عميل AXEL</small></article>`).join(''):'<p class="empty-state">لا توجد تقييمات حتى الآن</p>';};
+  const avg=pr.length?pr.reduce((a,r)=>a+Number(r.rating||0),0)/pr.length:0;
+  $('#reviewSummary')?.replaceChildren(Object.assign(document.createElement('div'),{className:'review-score',innerHTML:`<strong>${avg.toFixed(1)}</strong><span class="stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))}</span><small>${pr.length} تقييم</small>`}));
+  render(pr,$('#productReviews'));render(all,$('#allReviews'));
 }
 
-if (location.pathname.endsWith("product.html")) product(); else home();
+async function product(){
+  const id=new URLSearchParams(location.search).get('id'); if(!id||!$('#pname'))return;
+  try{ const {product:p}=await publicApi(`/products/${encodeURIComponent(id)}`); const images=p.images||[]; let color=(p.colors||[images[0]?.color]).find(Boolean)||''; let size=(p.sizes||[])[0]||'M'; let quantity=1; let coupon='';
+    $('#pname').textContent=p.name||'منتج AXEL';$('#pdesc').textContent=p.description||'تيشيرت AXEL';$('#pprice').textContent=money(p.salePrice);
+    const gallery=$('#gallery');
+    function render(){const colorImages=images.filter(x=>x.color===color);const list=colorImages.length?shuffle(colorImages):shuffle(images);const main=list[0];$('#pimage').src=main?.url||'';if(gallery)gallery.innerHTML=list.map((im,i)=>`<button class="thumb ${i===0?'active':''}" data-img-url="${escapeHtml(im.url)}" type="button"><img loading="lazy" src="${escapeHtml(im.url)}" alt="${escapeHtml(p.name)}"></button>`).join('');const colors=p.colors?.length?p.colors:[...new Set(images.map(x=>x.color).filter(Boolean))];$('#colors').innerHTML=colors.map(c=>`<button type="button" class="option ${c===color?'active':''}" data-color="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');$('#sizes').innerHTML=(p.sizes||['M','L','XL','XXL']).map(z=>{const q=Number(p.stock?.[color]?.[z]||0);return `<button type="button" class="option ${z===size?'active':''} ${q<=0?'sold-out':''}" data-size="${escapeHtml(z)}" ${q<=0?'disabled':''}>${escapeHtml(z)}</button>`}).join('');const available=Number(p.stock?.[color]?.[size]||0);$('#stock').textContent=available?`المتاح: ${available} قطعة`:'نفذت الكمية';$('#quantityValue').textContent=quantity;$('#buy').disabled=!available;}
+    $('#colors').onclick=e=>{const b=e.target.closest('[data-color]');if(b){color=b.dataset.color;size=(p.sizes||[]).find(z=>Number(p.stock?.[color]?.[z]||0)>0)||size;quantity=1;render();}};$('#sizes').onclick=e=>{const b=e.target.closest('[data-size]');if(b&&!b.disabled){size=b.dataset.size;quantity=1;render();}};gallery?.addEventListener('click',e=>{const b=e.target.closest('[data-img-url]');if(!b)return;$('#pimage').src=b.dataset.imgUrl;$$('.thumb',gallery).forEach(x=>x.classList.remove('active'));b.classList.add('active')});$('#qtyMinus').onclick=()=>{quantity=Math.max(1,quantity-1);render()};$('#qtyPlus').onclick=()=>{const max=Number(p.stock?.[color]?.[size]||0);quantity=Math.min(max||1,quantity+1);render()};
+    async function applyCoupon(){const code=$('#productCoupon').value.trim();if(!code){coupon='';$('#productCouponMsg').textContent='';return true}const sub=Number(p.salePrice||0)*quantity;const r=await fetch(`${API_URL}/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${sub}`),d=await r.json();if(!r.ok||!d.ok){coupon='';$('#productCouponMsg').textContent=d.error||'الكود غير صالح';return false}coupon=code.toUpperCase();$('#productCouponMsg').textContent=`تم تطبيق خصم ${money(d.coupon.discount)}`;return true}
+    $('#applyProductCoupon').onclick=()=>applyCoupon().catch(()=>{$('#productCouponMsg').textContent='تعذر التحقق من الكود'});$('#buy').onclick=async()=>{if(!(await applyCoupon()))return;location.href=`checkout.html?id=${encodeURIComponent(id)}&color=${encodeURIComponent(color)}&size=${encodeURIComponent(size)}&quantity=${quantity}&coupon=${encodeURIComponent(coupon)}`};
+    $('#reviewForm')?.addEventListener('submit',async e=>{e.preventDefault();const msg=$('#reviewMsg');try{const r=await fetch(`${API_URL}/reviews`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:id,name:$('#reviewName').value.trim(),rating:Number($('#reviewRating').value),comment:$('#reviewComment').value.trim()})});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'تعذر إرسال التقييم');msg.textContent='تم إضافة رأيك بنجاح';$('#reviewForm').reset();await loadReviews(id)}catch(e){msg.textContent=e.message}});
+    render();await loadReviews(id);
+  }catch(e){$('#pname').textContent=e.message||'تعذر تحميل المنتج'}
+}
+
+async function homeReviews(){try{const {reviews=[]}=await publicApi('/reviews');const el=$('#homeReviews');if(el)el.innerHTML=reviews.length?reviews.slice(0,8).map(r=>`<article class="review-card"><div class="review-top"><b>${escapeHtml(r.name||'عميل AXEL')}</b><span class="stars">${'★'.repeat(Number(r.rating||0))}${'☆'.repeat(5-Number(r.rating||0))}</span></div><p>${escapeHtml(r.comment||'')}</p><small>${escapeHtml(r.productName||'منتج AXEL')}</small></article>`).join(''):'<p class="empty-state">لا توجد تقييمات حتى الآن</p>';}catch{}}
+
+if (location.pathname.endsWith("product.html")) product(); else { home(); homeReviews(); }

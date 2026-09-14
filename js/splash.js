@@ -1,0 +1,1 @@
+(() => { const el=document.getElementById('axelSplash'); if(!el)return; const text=el.querySelector('.splash-typing'); if(text){const full=text.textContent.trim();text.textContent='';let i=0;const t=setInterval(()=>{text.textContent=full.slice(0,++i);if(i>=full.length)clearInterval(t)},55)} setTimeout(()=>{el.classList.add('hide');setTimeout(()=>el.remove(),650)},1900); })();

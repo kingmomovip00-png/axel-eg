@@ -19,6 +19,7 @@
       <button type="button" class="ax-tab" data-view="products">المنتجات</button>
       <button type="button" class="ax-tab" data-view="orders">الطلبات</button>
       <button type="button" class="ax-tab" data-view="banners">البانرات</button>
+      <button type="button" class="ax-tab" data-view="coupons">الكوبونات</button>
     </nav>
   </header>
 
@@ -117,6 +118,7 @@
       <div class="ax-banner-layout">
         <section class="ax-card">
           <h2>إضافة بانر جديد</h2>
+          <div class="ax-grid two"><label>المنتج المرتبط بالبانر <select id="bannerProduct"><option value="">بدون منتج</option></select></label><label>سعر العرض <input id="bannerOfferPrice" type="number" min="1" placeholder="مثال 399"></label><label>لون العرض (اختياري) <input id="bannerOfferColor" placeholder="يُستخدم داخليًا فقط"></label></div>
           <label class="ax-file-label">اختيار صورة البانر <input id="bannerFile" type="file" accept="image/*"></label>
           <div id="bannerPreview" class="ax-banner-preview"></div>
           <button id="uploadBanner" type="button" class="ax-btn ax-btn-primary">رفع البانر</button>
@@ -129,7 +131,14 @@
         </section>
       </div>
     </section>
-  </main>
+  
+    <section class="ax-view" data-panel="coupons">
+      <div class="ax-page-head"><div><h1>كوبونات الخصم</h1><p>أنشئ أكواد الخصم وتحكم في قيمتها وحدود استخدامها.</p></div></div>
+      <section class="ax-card">
+        <form id="couponForm"><div class="ax-grid two"><label>الكود <input id="couponCode" required maxlength="30" placeholder="AXEL20"></label><label>نوع الخصم <select id="couponType"><option value="percent">نسبة مئوية</option><option value="fixed">مبلغ ثابت</option></select></label><label>قيمة الخصم <input id="couponValue" type="number" min="1" required></label><label>الحد الأدنى للطلب <input id="couponMin" type="number" min="0" value="0"></label><label>أقصى خصم <input id="couponMax" type="number" min="0" value="0"></label><label>حد الاستخدام <input id="couponLimit" type="number" min="0" value="0"><small>0 = بدون حد</small></label><label>تاريخ الانتهاء <input id="couponExpiry" type="datetime-local"></label></div><label><input id="couponActive" type="checkbox" checked> الكود فعال</label><div class="ax-form-actions"><button class="ax-btn ax-btn-primary" type="submit">إنشاء الكوبون</button></div></form><div id="couponsList" class="ax-manager-list"></div>
+      </section>
+    </section>
+</main>
   <script type="module" src="js/admin.js"></script>
 </body>
 </html>
