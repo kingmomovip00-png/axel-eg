@@ -194,6 +194,33 @@ app.get("/api/banners/:id", async (req, res) => {
   } catch { res.status(500).json({ ok: false, error: "فشل تحميل البانر" }); }
 });
 
+// ---------- IMAGEKIT DIRECT-UPLOAD AUTH ----------
+// Vercel Functions have a request-body limit, so the browser uploads images
+// directly to ImageKit. This endpoint only signs the short-lived upload request.
+app.get("/api/imagekit/auth", requireAdmin, async (req, res) => {
+  if (!isImageKitConfigured()) {
+    return res.status(503).json({ ok: false, error: "ImageKit غير مُعد. راجع متغيرات ImageKit في Vercel." });
+  }
+  try {
+    const expire = Math.floor(Date.now() / 1000) + 60 * 10;
+    const token = crypto.randomUUID();
+    const signature = crypto.createHmac("sha1", process.env.IMAGEKIT_PRIVATE_KEY)
+      .update(token + expire)
+      .digest("hex");
+    res.json({
+      ok: true,
+      token,
+      expire,
+      signature,
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
+      uploadUrl: "https://upload.imagekit.io/api/v1/files/upload"
+    });
+  } catch (error) {
+    console.error("ImageKit auth error:", error.message);
+    res.status(500).json({ ok: false, error: "تعذر تجهيز رفع الصور." });
+  }
+});
+
 // ---------- ADMIN IMAGE UPLOAD ----------
 app.post("/api/upload", requireAdmin, upload.array("files", 20), async (req, res) => {
   if (!isImageKitConfigured()) return res.status(503).json({ ok: false, error: "ImageKit غير مُعد" });
@@ -598,8 +625,14 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`AXEL final backend running on port ${PORT}`);
-  console.log(`ImageKit: ${isImageKitConfigured() ? "configured" : "missing config"}`);
-  console.log(`Firebase Admin: ${firebaseReady ? "configured" : "missing config"}`);
-});
+// Vercel imports the Express app as a serverless function.
+// Keep local development working with `npm start`.
+if (!process.env.VERCEL) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`AXEL final backend running on port ${PORT}`);
+    console.log(`ImageKit: ${isImageKitConfigured() ? "configured" : "missing config"}`);
+    console.log(`Firebase Admin: ${firebaseReady ? "configured" : "missing config"}`);
+  });
+}
+
+export default app;

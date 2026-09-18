@@ -1,0 +1,39 @@
+AXEL V17 - إعداد Vercel
+
+هذه النسخة مصلحة لـ Vercel خصوصًا رفع الصور.
+
+المهم: الصور لم تعد تمر من Vercel. لوحة الإدارة تطلب توقيعًا مؤقتًا من السيرفر ثم ترفع الصورة مباشرة إلى ImageKit، لذلك صور 5-15MB لا تتوقف بسبب حد طلبات Vercel.
+
+ضع هذه Environment Variables في Vercel بنفس الأسماء:
+
+IMAGEKIT_PUBLIC_KEY
+IMAGEKIT_PRIVATE_KEY
+IMAGEKIT_URL_ENDPOINT
+ADMIN_EMAIL
+FIREBASE_SERVICE_ACCOUNT_BASE64
+TELEGRAM_CHAT_ID
+TELEGRAM_BOT_TOKEN
+FRONTEND_ORIGIN=*
+NODE_ENV=production
+SHIPPING_PRICE=50
+
+وللدفع عند تشغيل Paymob:
+PAYMOB_BASE_URL
+PAYMOB_SECRET_KEY
+PAYMOB_PUBLIC_KEY
+PAYMOB_HMAC_SECRET
+PAYMOB_INTEGRATION_ID_CARD
+APP_URL
+
+مهم جدًا:
+- لا تضع المفاتيح السرية داخل ملفات JavaScript أو HTML.
+- إذا كان أي Secret ظهر في صورة أو مستودع عام، قم بتغييره من الخدمة ثم حدّث Vercel.
+- بعد تعديل Environment Variables اعمل Redeploy من Vercel.
+
+اختبار سريع بعد النشر:
+1) افتح /api/health
+2) يجب أن تكون imagekit=true و firebaseAdmin=true
+3) سجّل دخول الإدارة.
+4) جرّب رفع صورة.
+
+ملاحظة: لا تحتاج إلى تثبيت ImageKit SDK في المتصفح. الرفع يتم مباشرة إلى ImageKit.

@@ -50,8 +50,31 @@ function preview(files,target){target.innerHTML='';[...files].forEach(file=>{con
 function renderImages(){el.uploadedImages.innerHTML=state.images.length?state.images.map((img,i)=>`<article><img src="${esc(img.url)}" alt="صورة"><div><b>${esc(img.color)}</b><button type="button" data-remove-image="${i}" class="ax-mini-danger">حذف الصورة</button></div></article>`).join(''):'<p class="ax-help">لم يتم رفع صور للمنتج حتى الآن.</p>';}
 
 async function upload(files,folder){
-  const fd=new FormData();[...files].forEach(f=>fd.append('files',f));fd.append('folder',folder);
-  return api('/upload',{method:'POST',body:fd,form:true});
+  // IMPORTANT for Vercel: do not send image bytes through the Vercel Function.
+  // Ask the protected backend for a short-lived ImageKit signature, then upload
+  // each image directly from the browser to ImageKit.
+  const authData = await api('/imagekit/auth');
+  const list = [...files];
+  if(!list.length) throw new Error('لم يتم اختيار أي صورة.');
+  const results = [];
+  const uploadOne = async (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('fileName', file.name);
+    fd.append('publicKey', authData.publicKey);
+    fd.append('signature', authData.signature);
+    fd.append('expire', String(authData.expire));
+    fd.append('token', authData.token);
+    fd.append('folder', folder);
+    fd.append('useUniqueFileName', 'true');
+    fd.append('tags', 'axel');
+    const res = await fetch(authData.uploadUrl, { method:'POST', body:fd });
+    const data = await res.json().catch(()=>({}));
+    if(!res.ok || !data.url) throw new Error(data.message || data.error || `فشل رفع الصورة ${file.name}`);
+    return {url:data.url,fileId:data.fileId,name:data.name,thumbnailUrl:data.thumbnailUrl||data.url};
+  };
+  // Upload in parallel to make the admin panel noticeably faster.
+  return {ok:true, files:await Promise.all(list.map(uploadOne))};
 }
 async function uploadProductImages(){
   const color=el.imageColor.value, files=[...el.productFiles.files];
