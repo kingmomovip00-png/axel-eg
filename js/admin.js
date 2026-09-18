@@ -50,17 +50,14 @@ function preview(files,target){target.innerHTML='';[...files].forEach(file=>{con
 function renderImages(){el.uploadedImages.innerHTML=state.images.length?state.images.map((img,i)=>`<article><img src="${esc(img.url)}" alt="صورة"><div><b>${esc(img.color)}</b><button type="button" data-remove-image="${i}" class="ax-mini-danger">حذف الصورة</button></div></article>`).join(''):'<p class="ax-help">لم يتم رفع صور للمنتج حتى الآن.</p>';}
 
 async function upload(files,folder){
-  // IMPORTANT for Vercel: do not send image bytes through the Vercel Function.
-  // Ask the protected backend for a short-lived ImageKit signature, then upload
-  // each image directly from the browser to ImageKit.
   const authData = await api('/imagekit/auth');
   const list = [...files];
   if(!list.length) throw new Error('لم يتم اختيار أي صورة.');
-  const results = [];
-  const uploadOne = async (file) => {
+  const uploadOne = (file) => new Promise((resolve,reject) => {
     const fd = new FormData();
-    fd.append('file', file);
-    fd.append('fileName', file.name);
+    const safeName = String(file.name || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_') || 'image.jpg';
+    fd.append('file', file, safeName);
+    fd.append('fileName', safeName);
     fd.append('publicKey', authData.publicKey);
     fd.append('signature', authData.signature);
     fd.append('expire', String(authData.expire));
@@ -68,12 +65,31 @@ async function upload(files,folder){
     fd.append('folder', folder);
     fd.append('useUniqueFileName', 'true');
     fd.append('tags', 'axel');
-    const res = await fetch(authData.uploadUrl, { method:'POST', body:fd });
-    const data = await res.json().catch(()=>({}));
-    if(!res.ok || !data.url) throw new Error(data.message || data.error || `فشل رفع الصورة ${file.name}`);
-    return {url:data.url,fileId:data.fileId,name:data.name,thumbnailUrl:data.thumbnailUrl||data.url};
-  };
-  // Upload in parallel to make the admin panel noticeably faster.
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', authData.uploadUrl, true);
+    xhr.responseType = 'text';
+    xhr.upload.onprogress = (event) => {
+      if(event.lengthComputable){
+        const pct = Math.round((event.loaded / event.total) * 70) + 10;
+        el.imageProgress.style.width = `${Math.min(80,pct)}%`;
+      }
+    };
+    xhr.onerror = () => reject(new Error('تعذر الاتصال بخدمة ImageKit. جرّب مرة أخرى وتأكد أن الصورة ليست أكبر من 25MB.'));
+    xhr.ontimeout = () => reject(new Error('انتهت مهلة رفع الصورة.'));
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText || '{}'); } catch {}
+      if(xhr.status >= 200 && xhr.status < 300 && data.url){
+        resolve({url:data.url,fileId:data.fileId,name:data.name,thumbnailUrl:data.thumbnailUrl||data.url});
+      } else {
+        const detail = data.message || data.error || data.help || `HTTP ${xhr.status}`;
+        reject(new Error(`ImageKit رفض الصورة ${file.name}: ${detail}`));
+      }
+    };
+    xhr.send(fd);
+  });
+
   return {ok:true, files:await Promise.all(list.map(uploadOne))};
 }
 async function uploadProductImages(){

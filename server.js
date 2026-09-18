@@ -16,7 +16,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "axel.support.eg@gmail.com").toLowerCase();
+const env = (name, fallback = "") => {
+  const value = process.env[name];
+  if (value == null) return fallback;
+  return String(value).trim().replace(/^(["'])(.*)\1$/, "$2").trim();
+};
+const ADMIN_EMAIL = env("ADMIN_EMAIL", "axel.support.eg@gmail.com").toLowerCase();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: 20 }
@@ -35,13 +40,13 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 const imagekit = new ImageKit({
-  publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
-  urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
+  publicKey: env("IMAGEKIT_PUBLIC_KEY"),
+  privateKey: env("IMAGEKIT_PRIVATE_KEY"),
+  urlEndpoint: env("IMAGEKIT_URL_ENDPOINT")
 });
 
 const isImageKitConfigured = () => Boolean(
-  process.env.IMAGEKIT_PUBLIC_KEY && process.env.IMAGEKIT_PRIVATE_KEY && process.env.IMAGEKIT_URL_ENDPOINT
+  env("IMAGEKIT_PUBLIC_KEY") && env("IMAGEKIT_PRIVATE_KEY") && env("IMAGEKIT_URL_ENDPOINT")
 );
 
 let db = null;
@@ -202,18 +207,19 @@ app.get("/api/imagekit/auth", requireAdmin, async (req, res) => {
     return res.status(503).json({ ok: false, error: "ImageKit غير مُعد. راجع متغيرات ImageKit في Vercel." });
   }
   try {
-    const expire = Math.floor(Date.now() / 1000) + 60 * 10;
-    const token = crypto.randomUUID();
-    const signature = crypto.createHmac("sha1", process.env.IMAGEKIT_PRIVATE_KEY)
-      .update(token + expire)
+    const expire = Math.floor(Date.now() / 1000) + 60 * 30;
+    const token = crypto.randomBytes(32).toString("hex");
+    const signature = crypto.createHmac("sha1", env("IMAGEKIT_PRIVATE_KEY"))
+      .update(`${token}${expire}`)
       .digest("hex");
     res.json({
       ok: true,
       token,
       expire,
       signature,
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
-      uploadUrl: "https://upload.imagekit.io/api/v1/files/upload"
+      publicKey: env("IMAGEKIT_PUBLIC_KEY"),
+      uploadUrl: "https://upload.imagekit.io/api/v1/files/upload",
+      expiresInSeconds: 1800
     });
   } catch (error) {
     console.error("ImageKit auth error:", error.message);
