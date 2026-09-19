@@ -30,7 +30,7 @@ function renderBanner(target, banner, index) {
   if (!target) return;
   if (!banner?.imageUrl) { target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`; return; }
   target.classList.remove("banner-enter"); void target.offsetWidth; target.classList.add("banner-enter");
-  target.innerHTML = `<a href="${banner.productId && banner.offerPrice ? `banner-offer.html?banner=${encodeURIComponent(banner.id)}` : (banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs")}" aria-label="عرض AXEL"><img src="${escapeHtml(banner.imageUrl)}" alt="AXEL" decoding="async"></a>`;
+  target.innerHTML = `<a href="${banner.productId && banner.offerPrice ? `banner-offer.html?banner=${encodeURIComponent(banner.id)}&product=${encodeURIComponent(banner.productId)}&price=${encodeURIComponent(banner.offerPrice)}&color=${encodeURIComponent(banner.offerColor||"")}` : (banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs")}" aria-label="عرض AXEL"><img src="${escapeHtml(banner.imageUrl)}" alt="AXEL" decoding="async"></a>`;
   const dots = target.parentElement?.querySelector(".banner-dots");
   if (dots) dots.innerHTML = "";
 }
