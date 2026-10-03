@@ -9,7 +9,7 @@ const CART_KEY="axelCartV1";
 function getCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||"[]")}catch{return []}}
 function setCart(cart){localStorage.setItem(CART_KEY,JSON.stringify(cart));updateCartCount();window.dispatchEvent(new CustomEvent("axel-cart-updated"));}
 function updateCartCount(){const n=getCart().reduce((a,x)=>a+Number(x.quantity||0),0);$$('#cartCount,#cartCountHeader').forEach(x=>x.textContent=n)}
-function addToCart(item){const cart=getCart();const key=`${item.productId}|${item.color}|${item.size}|${item.bannerId||""}`;const found=cart.find(x=>x.key===key);if(found)found.quantity=Math.min(Number(item.max||99),Number(found.quantity||0)+Number(item.quantity||1));else cart.push({...item,key,quantity:Number(item.quantity||1)});setCart(cart);showToast("تمت إضافة المنتج إلى السلة ✓");}
+function addToCart(item){const button=document.querySelector("#addToCart");if(button){button.classList.remove("cart-added");void button.offsetWidth;button.classList.add("cart-added");}const cart=getCart();const key=`${item.productId}|${item.color}|${item.size}|${item.bannerId||""}`;const found=cart.find(x=>x.key===key);if(found)found.quantity=Math.min(Number(item.max||99),Number(found.quantity||0)+Number(item.quantity||1));else cart.push({...item,key,quantity:Number(item.quantity||1)});setCart(cart);showToast("تمت إضافة المنتج إلى السلة ✓");}
 
 
 async function publicApi(path) {
@@ -34,24 +34,61 @@ function card(p, index = 0) {
 
 function renderBanner(target, banner, index) {
   if (!target) return;
-  const mediaUrl=banner?.mediaUrl||banner?.videoUrl||banner?.imageUrl;
-  if (!mediaUrl) { target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`; return; }
+  const mediaUrl = banner?.mediaUrl || banner?.videoUrl || banner?.imageUrl || "";
+  if (!mediaUrl) {
+    target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث فيديوهات AXEL</p></div>`;
+    return;
+  }
   target.classList.remove("banner-enter"); void target.offsetWidth; target.classList.add("banner-enter");
-  const href=banner.productId && banner.offerPrice ? `banner-offer.html?banner=${encodeURIComponent(banner.id)}&product=${encodeURIComponent(banner.productId)}&price=${encodeURIComponent(banner.offerPrice)}&color=${encodeURIComponent(banner.offerColor||"")}` : (banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs");
-  const isVideo=banner.mediaType==='video'||!!banner.videoUrl;
-  const media=isVideo ? `<video src="${escapeHtml(mediaUrl)}" autoplay muted loop playsinline preload="metadata"></video>` : `<img src="${escapeHtml(mediaUrl)}" alt="AXEL" decoding="async">`;
-  target.innerHTML = `<a href="${href}" aria-label="عرض AXEL">${media}</a>`;
-  const dots = target.parentElement?.querySelector(".banner-dots");
-  if (dots) dots.innerHTML = "";
+  const href = banner.productId ? `banner-offer.html?banner=${encodeURIComponent(banner.id)}&product=${encodeURIComponent(banner.productId)}&price=${encodeURIComponent(banner.offerPrice||0)}&color=${encodeURIComponent(banner.offerColor||"")}` : (banner.linkUrl ? banner.linkUrl : "#designs");
+  const isVideo = banner.mediaType === "video" || !!banner.videoUrl;
+  const media = isVideo
+    ? `<video src="${escapeHtml(mediaUrl)}" autoplay muted playsinline preload="metadata"></video>`
+    : `<img src="${escapeHtml(mediaUrl)}" alt="AXEL" decoding="async">`;
+  target.innerHTML = `<a href="${escapeHtml(href)}" aria-label="عرض المنتج">${media}</a>`;
+}
+
+function setupVideoHero(videos) {
+  const list = shuffle((videos || []).filter(b => b && (b.mediaType === "video" || b.videoUrl || /\.(mp4|webm|mov)(\?|$)/i.test(b.mediaUrl||""))));
+  const target = $("#bannerOne");
+  if (!target) return;
+  if (!list.length) { renderBanner(target, null, 0); return; }
+  let i = Math.floor(Math.random() * list.length);
+  const show = () => {
+    const b = list[i];
+    renderBanner(target, b, i);
+    const video = target.querySelector("video");
+    if (!video) return;
+    video.onended = () => {
+      if (list.length === 1) {
+        video.currentTime = 0;
+        video.play().catch(()=>{});
+      } else {
+        i = (i + 1) % list.length;
+        show();
+      }
+    };
+    video.onerror = () => {
+      if (list.length > 1) { i = (i + 1) % list.length; show(); }
+    };
+    video.play().catch(()=>{});
+  };
+  show();
+}
+
+function setupSecondBanner(banners) {
+  const list = shuffle((banners || []).filter(b => b && b.mediaType !== "video" && b.imageUrl));
+  const target = $("#bannerTwo");
+  if (!target) return;
+  if (!list.length) { target.innerHTML = ""; return; }
+  let i = Math.floor(Math.random() * list.length);
+  renderBanner(target, list[i], i);
+  if (list.length > 1) setInterval(() => { i=(i+1)%list.length; renderBanner(target,list[i],i); }, 4000);
 }
 
 function setupBanners(banners) {
-  const list = shuffle((banners || []).filter(b => b?.imageUrl));
-  const source = list.length ? list : [null];
-  let i1 = Math.floor(Math.random()*source.length), i2 = Math.floor(Math.random()*source.length);
-  renderBanner($("#bannerOne"), source[i1], i1); renderBanner($("#bannerTwo"), source[i2], i2);
-  const tick = () => { i1=(i1+1)%source.length; i2=(i2+1)%source.length; renderBanner($("#bannerOne"),source[i1],i1); renderBanner($("#bannerTwo"),source[i2],i2); };
-  if (source.length > 1) setInterval(tick, 4000);
+  setupVideoHero(banners);
+  setupSecondBanner(banners);
 }
 
 function setupRail(id) {

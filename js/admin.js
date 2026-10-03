@@ -50,48 +50,39 @@ function preview(files,target){target.innerHTML='';[...files].forEach(file=>{con
 function renderImages(){el.uploadedImages.innerHTML=state.images.length?state.images.map((img,i)=>`<article><img src="${esc(img.url)}" alt="صورة"><div><b>${esc(img.color)}</b><button type="button" data-remove-image="${i}" class="ax-mini-danger">حذف الصورة</button></div></article>`).join(''):'<p class="ax-help">لم يتم رفع صور للمنتج حتى الآن.</p>';}
 
 async function upload(files,folder){
-  const authData = await api('/imagekit/auth');
-  const list = [...files];
-  if(!list.length) throw new Error('لم يتم اختيار أي صورة.');
-  const uploadOne = (file) => new Promise((resolve,reject) => {
-    const fd = new FormData();
-    const safeName = String(file.name || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_') || 'image.jpg';
-    fd.append('file', file, safeName);
-    fd.append('fileName', safeName);
-    fd.append('publicKey', authData.publicKey);
-    fd.append('signature', authData.signature);
-    fd.append('expire', String(authData.expire));
-    fd.append('token', authData.token);
-    fd.append('folder', folder);
-    fd.append('useUniqueFileName', 'true');
-    fd.append('tags', 'axel');
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', authData.uploadUrl, true);
-    xhr.responseType = 'text';
-    xhr.upload.onprogress = (event) => {
-      if(event.lengthComputable){
-        const pct = Math.round((event.loaded / event.total) * 70) + 10;
-        el.imageProgress.style.width = `${Math.min(80,pct)}%`;
-      }
-    };
-    xhr.onerror = () => reject(new Error('تعذر الاتصال بخدمة ImageKit. جرّب مرة أخرى وتأكد أن الصورة ليست أكبر من 25MB.'));
-    xhr.ontimeout = () => reject(new Error('انتهت مهلة رفع الصورة.'));
-    xhr.onload = () => {
-      let data = {};
-      try { data = JSON.parse(xhr.responseText || '{}'); } catch {}
-      if(xhr.status >= 200 && xhr.status < 300 && data.url){
-        resolve({url:data.url,fileId:data.fileId,name:data.name,thumbnailUrl:data.thumbnailUrl||data.url});
-      } else {
-        const detail = data.message || data.error || data.help || `HTTP ${xhr.status}`;
-        reject(new Error(`ImageKit رفض الصورة ${file.name}: ${detail}`));
-      }
-    };
-    xhr.send(fd);
-  });
-
-  return {ok:true, files:await Promise.all(list.map(uploadOne))};
+  const list=[...files];
+  if(!list.length) throw new Error('لم يتم اختيار أي ملف.');
+  const uploadOne = async (file) => {
+    // ImageKit tokens are one-time; obtain fresh auth for every file.
+    const authData = await api('/imagekit/auth');
+    return new Promise((resolve,reject) => {
+      const fd = new FormData();
+      const ext = (file.name||'').split('.').pop() || 'bin';
+      const base = (file.name||'file').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_') || 'file';
+      const safeName = `${base}.${ext.toLowerCase()}`;
+      fd.append('file', file, safeName);
+      fd.append('fileName', safeName);
+      fd.append('publicKey', authData.publicKey);
+      fd.append('signature', authData.signature);
+      fd.append('expire', String(authData.expire));
+      fd.append('token', authData.token);
+      fd.append('folder', folder);
+      fd.append('useUniqueFileName', 'true');
+      fd.append('tags', 'axel');
+      const xhr=new XMLHttpRequest();
+      xhr.open('POST',authData.uploadUrl,true);xhr.responseType='text';xhr.timeout=180000;
+      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*80)+10;const target=folder.includes('videos')?el.bannerProgress:el.imageProgress;if(target)target.style.width=`${Math.min(90,pct)}%`;}};
+      xhr.onerror=()=>reject(new Error('تعذر الاتصال بخدمة ImageKit. تأكد من الإنترنت وحاول مرة أخرى.'));
+      xhr.ontimeout=()=>reject(new Error('انتهت مهلة الرفع. جرّب ملفًا أصغر أو اتصالًا أفضل.'));
+      xhr.onload=()=>{let data={};try{data=JSON.parse(xhr.responseText||'{}')}catch{};if(xhr.status>=200&&xhr.status<300&&data.url)resolve({url:data.url,fileId:data.fileId,name:data.name,thumbnailUrl:data.thumbnailUrl||data.url});else reject(new Error(`ImageKit رفض الملف ${file.name}: ${data.message||data.error||`HTTP ${xhr.status}`}`));};
+      xhr.send(fd);
+    });
+  };
+  const out=[];
+  for(const file of list) out.push(await uploadOne(file));
+  return {ok:true,files:out};
 }
+
 async function uploadProductImages(){
   const color=el.imageColor.value, files=[...el.productFiles.files];
   if(!colors().length){message('اختر لونًا واحدًا على الأقل أولاً.','error');return;}
