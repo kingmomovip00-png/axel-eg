@@ -12,7 +12,7 @@
   <div class="container nav">
     <a class="nav-left nav-pill nav-icon-link" href="#designs"><img src="assets/icons/designs.svg" alt=""><span>التصميمات</span></a>
     <a class="nav-logo-link" href="index.html" aria-label="AXEL"><img src="assets/logo/logo.png" class="brand-logo" alt="AXEL"></a>
-    <a class="nav-side nav-pill nav-icon-link" href="track.html"><img src="assets/icons/track.svg" alt=""> <span>تتبع الطلب</span></a>
+    <div class="nav-actions"><a class="nav-side nav-pill nav-icon-link" href="track.html"><img src="assets/icons/track.svg" alt=""> <span>تتبع الطلب</span></a><a class="nav-cart nav-pill" href="cart.html" aria-label="السلة">🛒 <span>السلة</span><b id="cartCount">0</b></a></div>
   </div>
 </header>
 
@@ -31,7 +31,7 @@
           <button type="button" class="slider-btn" data-slider="designs" data-dir="prev" aria-label="السابق">›</button>
         </div>
       </div>
-      <div id="productsDesigns" class="product-rail" tabindex="0" aria-label="التصميمات"></div>
+      <div id="productsDesigns" class="product-rail" tabindex="0" aria-label="التصميمات"></div><button class="see-more" type="button" data-more-target="productsDesigns">عرض المزيد</button>
     </section>
 
     <section class="mid-banner banner-frame reveal-section" aria-label="بانر AXEL الثاني">
@@ -43,15 +43,17 @@
       <div class="section-heading">
         <div><span class="eyebrow">AXEL COLLECTION</span><h2>التصميمات والأنمي</h2></div>
       </div>
-      <div id="productsMixed" class="product-grid-mixed"></div>
+      <div id="productsMixed" class="product-grid-mixed"></div><button class="see-more" type="button" data-more-target="productsMixed">عرض المزيد</button>
     </section>
 
     <section id="anime" class="section reveal-section">
       <div class="section-heading">
         <div><span class="eyebrow">SPECIAL DROP</span><h2>تصميمات الأنمي</h2></div>
       </div>
-      <div id="productsAnime" class="product-grid-anime"></div>
+      <div id="productsAnime" class="product-grid-anime"></div><button class="see-more" type="button" data-more-target="productsAnime">عرض المزيد</button>
     </section>
+
+    <section id="homeCoupon" class="home-coupon hidden reveal-section"><div><span class="eyebrow">SPECIAL COUPON</span><h2 id="homeCouponTitle"></h2><p id="homeCouponText"></p></div><div class="home-coupon-code"><b id="homeCouponCode"></b><button id="copyHomeCoupon" type="button">نسخ الكود</button></div></section>
 
     <section id="offer" class="offer hidden reveal-section">
       <div><span class="eyebrow">LIMITED OFFER</span><h2 id="offerTitle"></h2></div>
