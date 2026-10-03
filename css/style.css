@@ -286,9 +286,4 @@ main, main *, .footer, .footer * { min-width:0; max-width:100%; }
 @media(max-width:600px){.nav-actions{gap:4px}.nav-actions .nav-side span,.nav-cart span{display:none}.home-coupon{flex-direction:column;align-items:stretch;text-align:center}.home-coupon-code{justify-content:center}.product-actions{display:grid;grid-template-columns:1fr 1fr}.product-actions .btn{min-width:0;width:100%}.cart-item{grid-template-columns:85px 1fr}.cart-item>img{width:85px;height:110px}}
 
 .ax-stats-large{grid-template-columns:repeat(4,1fr)!important}.ax-stats-large article{min-height:88px}.ax-stats-large strong{font-size:20px!important}.coupon-remaining{color:var(--blue)}@media(max-width:800px){.ax-stats-large{grid-template-columns:repeat(2,1fr)!important}}
-
-/* V21 media + payment */
-.banner-stage video{width:100%;height:100%;object-fit:cover;display:block;background:#111}
-.ax-banner-preview video{width:100%;max-height:320px;border-radius:14px;object-fit:contain;background:#111}
-.ax-manager video{width:110px;height:90px;object-fit:cover;border-radius:12px;background:#111}
-#couponProducts{min-height:120px}
+.banner-stage>a{display:block;width:100%;height:100%}.banner-stage>a>video{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit}.admin-media-preview{width:100%;max-height:260px;border-radius:16px;object-fit:cover}.payment-empty{padding:18px;border:1px dashed rgba(60,174,184,.35);border-radius:16px;text-align:center;line-height:1.8}.payment-empty.error{color:#b42318}.payment-help{display:block;margin-top:8px;opacity:.75}

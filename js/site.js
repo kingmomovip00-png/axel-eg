@@ -8,7 +8,7 @@ const shuffle = arr => { const a = [...arr]; for (let i=a.length-1;i>0;i--){cons
 const CART_KEY="axelCartV1";
 function getCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||"[]")}catch{return []}}
 function setCart(cart){localStorage.setItem(CART_KEY,JSON.stringify(cart));updateCartCount();window.dispatchEvent(new CustomEvent("axel-cart-updated"));}
-function updateCartCount(){const n=getCart().reduce((a,x)=>a+Number(x.quantity||0),0);$$('#cartCount').forEach(x=>x.textContent=n)}
+function updateCartCount(){const n=getCart().reduce((a,x)=>a+Number(x.quantity||0),0);$$('#cartCount,#cartCountHeader').forEach(x=>x.textContent=n)}
 function addToCart(item){const cart=getCart();const key=`${item.productId}|${item.color}|${item.size}|${item.bannerId||""}`;const found=cart.find(x=>x.key===key);if(found)found.quantity=Math.min(Number(item.max||99),Number(found.quantity||0)+Number(item.quantity||1));else cart.push({...item,key,quantity:Number(item.quantity||1)});setCart(cart);showToast("تمت إضافة المنتج إلى السلة ✓");}
 
 
@@ -32,9 +32,27 @@ function card(p, index = 0) {
   </a>`;
 }
 
-function bannerHref(b){if(!b)return '#designs';if(b.productId&&Number(b.offerPrice||0)>0)return `banner-offer.html?banner=${encodeURIComponent(b.id)}&product=${encodeURIComponent(b.productId)}&price=${encodeURIComponent(b.offerPrice)}&color=${encodeURIComponent(b.offerColor||'')}`;if(b.productId)return `product.html?id=${encodeURIComponent(b.productId)}`;return b.linkUrl||'#designs';}
-function renderBanner(target, banner, index) { if(!target)return; if(!banner){target.innerHTML='<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>';return;}target.classList.remove('banner-enter');void target.offsetWidth;target.classList.add('banner-enter');const href=bannerHref(banner);const media=banner.mediaType==='video'&&banner.videoUrl?`<video src="${escapeHtml(banner.videoUrl)}" autoplay muted loop playsinline preload="metadata"></video>`:`<img src="${escapeHtml(banner.imageUrl||'')}" alt="AXEL" decoding="async">`;target.innerHTML=`<a href="${escapeHtml(href)}" aria-label="عرض AXEL">${media}</a>`;}
-function setupBanners(banners){const all=shuffle((banners||[]).filter(b=>b&&((b.mediaType==='video'&&b.videoUrl)||b.imageUrl)));const hero=shuffle(all.filter(b=>!b.placement||b.placement==='hero'));const mid=shuffle(all.filter(b=>b.placement==='mid'));const h=hero.length?hero:[null],m=mid.length?mid:[...h];let i1=Math.floor(Math.random()*h.length),i2=Math.floor(Math.random()*m.length);renderBanner($('#bannerOne'),h[i1],i1);renderBanner($('#bannerTwo'),m[i2],i2);const tick=()=>{if(h.length>1){i1=(i1+1)%h.length;renderBanner($('#bannerOne'),h[i1],i1);}if(m.length>1){i2=(i2+1)%m.length;renderBanner($('#bannerTwo'),m[i2],i2);}};if(h.length>1||m.length>1)setInterval(tick,4000);}
+function renderBanner(target, banner, index) {
+  if (!target) return;
+  const mediaUrl=banner?.mediaUrl||banner?.videoUrl||banner?.imageUrl;
+  if (!mediaUrl) { target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث التصميمات من AXEL</p></div>`; return; }
+  target.classList.remove("banner-enter"); void target.offsetWidth; target.classList.add("banner-enter");
+  const href=banner.productId && banner.offerPrice ? `banner-offer.html?banner=${encodeURIComponent(banner.id)}&product=${encodeURIComponent(banner.productId)}&price=${encodeURIComponent(banner.offerPrice)}&color=${encodeURIComponent(banner.offerColor||"")}` : (banner.linkUrl ? escapeHtml(banner.linkUrl) : "#designs");
+  const isVideo=banner.mediaType==='video'||!!banner.videoUrl;
+  const media=isVideo ? `<video src="${escapeHtml(mediaUrl)}" autoplay muted loop playsinline preload="metadata"></video>` : `<img src="${escapeHtml(mediaUrl)}" alt="AXEL" decoding="async">`;
+  target.innerHTML = `<a href="${href}" aria-label="عرض AXEL">${media}</a>`;
+  const dots = target.parentElement?.querySelector(".banner-dots");
+  if (dots) dots.innerHTML = "";
+}
+
+function setupBanners(banners) {
+  const list = shuffle((banners || []).filter(b => b?.imageUrl));
+  const source = list.length ? list : [null];
+  let i1 = Math.floor(Math.random()*source.length), i2 = Math.floor(Math.random()*source.length);
+  renderBanner($("#bannerOne"), source[i1], i1); renderBanner($("#bannerTwo"), source[i2], i2);
+  const tick = () => { i1=(i1+1)%source.length; i2=(i2+1)%source.length; renderBanner($("#bannerOne"),source[i1],i1); renderBanner($("#bannerTwo"),source[i2],i2); };
+  if (source.length > 1) setInterval(tick, 4000);
+}
 
 function setupRail(id) {
   const el=document.getElementById(id); if(!el)return; let timer=null,resume=null,drag=false,startX=0,startScroll=0;

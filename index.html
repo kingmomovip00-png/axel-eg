@@ -10,9 +10,9 @@
 <body><div id="axelSplash" class="axel-splash"><img src="assets/logo/logo.png" alt="AXEL"><div class="splash-typing">Welcome to AXEL</div></div>
 <header class="header">
   <div class="container nav">
-    <a class="nav-left nav-pill nav-icon-link" href="#designs"><img src="assets/icons/designs.svg" alt=""><span>التصميمات</span></a>
+    <a class="nav-left nav-cart nav-pill" href="cart.html" aria-label="السلة">🛒 <span>السلة</span><b id="cartCountHeader">0</b></a>
     <a class="nav-logo-link" href="index.html" aria-label="AXEL"><img src="assets/logo/logo.png" class="brand-logo" alt="AXEL"></a>
-    <div class="nav-actions"><a class="nav-side nav-pill nav-icon-link" href="track.html"><img src="assets/icons/track.svg" alt=""> <span>تتبع الطلب</span></a><a class="nav-cart nav-pill" href="cart.html" aria-label="السلة">🛒 <span>السلة</span><b id="cartCount">0</b></a></div>
+    <div class="nav-actions"><a class="nav-side nav-pill nav-icon-link" href="track.html"><img src="assets/icons/track.svg" alt=""> <span>تتبع الطلب</span></a></div>
   </div>
 </header>
 
@@ -22,6 +22,9 @@
       <div id="bannerOne" class="banner-stage"></div>
       <div class="banner-dots" id="bannerDotsOne" aria-hidden="true"></div>
     </section>
+
+    <section id="homeCoupon" class="home-coupon hidden reveal-section"><div><span class="eyebrow">SPECIAL COUPON</span><h2 id="homeCouponTitle"></h2><p id="homeCouponText"></p></div><div class="home-coupon-code"><b id="homeCouponCode"></b><button id="copyHomeCoupon" type="button">نسخ الكود</button></div></section>
+
 
     <section id="designs" class="section reveal-section">
       <div class="section-heading">
@@ -53,7 +56,6 @@
       <div id="productsAnime" class="product-grid-anime"></div><button class="see-more" type="button" data-more-target="productsAnime">عرض المزيد</button>
     </section>
 
-    <section id="homeCoupon" class="home-coupon hidden reveal-section"><div><span class="eyebrow">SPECIAL COUPON</span><h2 id="homeCouponTitle"></h2><p id="homeCouponText"></p></div><div class="home-coupon-code"><b id="homeCouponCode"></b><button id="copyHomeCoupon" type="button">نسخ الكود</button></div></section>
 
     <section id="offer" class="offer hidden reveal-section">
       <div><span class="eyebrow">LIMITED OFFER</span><h2 id="offerTitle"></h2></div>

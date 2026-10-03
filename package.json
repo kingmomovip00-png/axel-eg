@@ -1,15 +1,13 @@
 {
   "name": "axel-final-store",
-  "version": "2.1.0",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js"
   },
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": {"node": ">=20"},
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
