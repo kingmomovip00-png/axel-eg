@@ -1,85 +1,10 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AXEL | عرض خاص</title><link rel="stylesheet" href="css/style.css"></head><body class="banner-offer-page"><div id="axelSplash" class="axel-splash"><img src="assets/logo/logo.png" alt="AXEL"><div class="splash-typing">Welcome to AXEL</div></div><main class="container offer-product"><a class="back-link" href="index.html">العودة للموقع</a><div class="offer-product-card"><img id="offerImage" class="product-main" alt=""><div class="product-info"><p class="eyebrow">LIMITED OFFER</p><h1 id="offerName">جاري التحميل...</h1><div id="offerPrice" class="price"></div><p id="offerStock"></p><h3>المقاس</h3><div id="offerSizes" class="options"></div><div class="coupon-box"><label>كود الخصم <input id="offerCoupon" placeholder="اكتب الكود"></label><button id="applyOfferCoupon" class="btn secondary" type="button">تطبيق</button><small id="offerCouponMsg"></small></div><button id="offerBuy" class="btn buy-btn" disabled>اطلب الآن</button><div class="policy-box"><details open><summary>سياسة الشحن</summary><p>مدة الشحن من يومين إلى 3 أيام</p></details><details><summary>سياسة الاستبدال والاسترجاع</summary><p>خلال 24 ساعة من استلام المنتج مع إبلاغنا بالمشكلة وسببها</p></details></div></div></div></main><script src="js/splash.js"></script><script type="module">
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AXEL | عرض خاص</title><link rel="stylesheet" href="css/style.css"></head><body class="banner-offer-page"><div class="inner-topbar"><button class="page-back" type="button" onclick="if(history.length>1)history.back();else location.href='index.html'" aria-label="رجوع">‹</button></div><div id="axelSplash" class="axel-splash"><img src="assets/logo/logo.png" alt="AXEL"><div class="splash-typing">Welcome to AXEL</div></div><main class="container offer-product"><div class="offer-product-card"><img id="offerImage" class="product-main" alt=""><div class="product-info"><p class="eyebrow">LIMITED OFFER</p><h1 id="offerName">جاري التحميل...</h1><div id="offerPrice" class="price"></div><p id="offerStock"></p><h3>اللون</h3><div id="offerColors" class="options"></div><h3>المقاس</h3><div id="offerSizes" class="options"></div><div class="coupon-box"><label>كود الخصم <input id="offerCoupon" placeholder="اكتب الكود"></label><button id="applyOfferCoupon" class="btn secondary" type="button">تطبيق</button><small id="offerCouponMsg"></small></div><button id="offerBuy" class="btn buy-btn" disabled>اطلب الآن</button><div class="policy-box"><details open><summary>سياسة الشحن</summary><p>مدة الشحن من يومين إلى 3 أيام</p></details><details><summary>سياسة الاستبدال والاسترجاع</summary><p>خلال 24 ساعة من استلام المنتج مع إبلاغنا بالمشكلة وسببها</p></details></div></div></div></main><section class="similar-section container"><div class="section-heading"><div><span class="eyebrow">YOU MAY ALSO LIKE</span><h2>منتجات مشابهة</h2></div></div><div id="similarRail" class="product-rail similar-rail" tabindex="0"></div></section><section class="reviews-section container" id="reviews"><div class="section-heading"><div><span class="eyebrow">CUSTOMER REVIEWS</span><h2>آراء العملاء</h2></div><button id="toggleReviewForm" class="review-toggle btn secondary" type="button">إضافة مراجعة</button></div><div id="reviewSummary" class="review-summary"></div><div id="productReviews" class="reviews-list"></div><form id="reviewForm" class="review-form hidden"><h3>اكتب رأيك في المنتج</h3><div class="form-row"><label>الاسم<input id="reviewName" required maxlength="80"></label><label>التقييم<select id="reviewRating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select></label></div><label>رأيك<textarea id="reviewComment" required maxlength="800" placeholder="شارك تجربتك مع المنتج"></textarea></label><button class="btn" type="submit">إرسال التقييم</button><p id="reviewMsg"></p></form><div class="all-reviews-wrap"><h3>آراء العملاء الآخرين</h3><div id="allReviews" class="reviews-list"></div></div></section><footer class="footer"><div class="container footer-inner"><div class="footer-brand"><img src="assets/logo/logo.png" class="footer-logo" alt="AXEL"></div><div class="socials"><a href="https://www.facebook.com/share/1DmkpdyAWo/" target="_blank"><img src="assets/icons/facebook.svg" alt=""></a><a href="https://www.instagram.com/axel.egypt" target="_blank"><img src="assets/icons/instagram.svg" alt=""></a><a href="https://www.tiktok.com/@axel_egypt" target="_blank"><img src="assets/icons/tiktok.svg" alt=""></a><a href="https://wa.me/201153040626" target="_blank"><img src="assets/icons/whatsapp.svg" alt=""></a></div><div class="footer-bottom">Powered by GMV MEDIA</div></div></footer><script src="js/splash.js"></script><script type="module">
 import {API_URL} from './js/config.js';
-const q=new URLSearchParams(location.search);
-const bid=q.get('banner')||'';
-const hintedProduct=q.get('product')||'';
-const hintedPrice=Number(q.get('price')||0);
-const hintedColor=q.get('color')||'';
-const $=s=>document.querySelector(s);
-let b=null,p=null,size='',coupon='';
-const money=n=>new Intl.NumberFormat('ar-EG',{maximumFractionDigits:0}).format(Number(n)||0)+' ج';
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-function showCoupon(x){$('#offerCouponMsg').textContent=x||''}
-function showError(msg){
-  $('#offerName').textContent=msg||'تعذر تحميل العرض';
-  $('#offerPrice').textContent='';
-  $('#offerStock').textContent='';
-  $('#offerSizes').innerHTML='';
-  $('#offerBuy').disabled=true;
-}
-async function fetchJson(url,timeout=9000){
-  const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),timeout);
-  try{
-    const r=await fetch(url,{headers:{Accept:'application/json'},cache:'no-store',signal:controller.signal});
-    let d=null; try{d=await r.json()}catch{}
-    if(!r.ok) throw Error(d?.error||`HTTP ${r.status}`);
-    return d;
-  } finally { clearTimeout(timer); }
-}
-async function validateCoupon(){
-  const sub=Number(b?.offerPrice||hintedPrice||0);
-  const code=$('#offerCoupon').value.trim();
-  if(!code){coupon='';showCoupon('');return true}
-  try{
-    const d=await fetchJson(`${API_URL}/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${sub}`);
-    if(!d.ok) throw Error(d.error||'الكود غير صالح');
-    coupon=code.toUpperCase();showCoupon(`خصم ${money(d.coupon.discount)}`);return true;
-  }catch(e){showCoupon(e.message||'تعذر التحقق من الكود');return false}
-}
-function render(){
-  const color=b?.offerColor||hintedColor||p.colors?.[0]||p.images?.find(x=>x.color)?.color||'';
-  const available=Number(p.stock?.[color]?.[size]||0);
-  $('#offerStock').textContent=available?`المتاح: ${available} قطعة`:'نفذت الكمية';
-  $('#offerBuy').disabled=!available;
-  $('#offerSizes').innerHTML=(p.sizes?.length?p.sizes:['M','L','XL','XXL']).map(z=>{
-    const q=Number(p.stock?.[color]?.[z]||0);
-    return `<button type="button" class="option ${z===size?'active':''}" data-size="${esc(z)}" ${q<=0?'disabled':''}>${esc(z)}</button>`;
-  }).join('');
-  $('#offerSizes').onclick=e=>{const x=e.target.closest('[data-size]');if(x&&!x.disabled){size=x.dataset.size;render()}};
-}
-async function load(){
-  if(!bid && !hintedProduct){showError('العرض غير موجود');return}
-  // Prefer live banner data. If that endpoint is unavailable on a serverless deployment,
-  // use the product/price embedded in the banner link as a display fallback. Checkout still
-  // validates bannerId + live offer price on the server, so the fallback cannot authorize a fake offer.
-  try{
-    if(bid){
-      const d=await fetchJson(`${API_URL}/banners/${encodeURIComponent(bid)}`);
-      if(!d?.ok||!d.banner) throw Error(d?.error||'العرض غير موجود');
-      b=d.banner;
-    }
-  }catch(e){
-    if(!hintedProduct){throw Error(e.name==='AbortError'?'انتهت مهلة تحميل العرض':'تعذر تحميل بيانات العرض');}
-    b={id:bid,productId:hintedProduct,offerPrice:hintedPrice,offerColor:hintedColor};
-  }
-  if(!b.productId) throw Error('لم يتم ربط هذا البانر بمنتج');
-  if(!(Number(b.offerPrice)>0) && !(hintedPrice>0)) throw Error('سعر العرض غير محدد');
-  if(!(Number(b.offerPrice)>0)) b.offerPrice=hintedPrice;
-  const pd=await fetchJson(`${API_URL}/products/${encodeURIComponent(b.productId)}`);
-  if(!pd?.ok||!pd.product) throw Error(pd?.error||'المنتج غير موجود');
-  p=pd.product;
-  $('#offerName').textContent=p.name||'منتج AXEL';
-  $('#offerPrice').textContent=money(b.offerPrice);
-  const color=b.offerColor||hintedColor||p.colors?.[0]||p.images?.find(x=>x.color)?.color||'';
-  const imgs=(p.images||[]).filter(x=>!x.color||x.color===color);
-  $('#offerImage').src=(imgs[0]||p.images?.[0])?.url||'';
-  size=(p.sizes||['M','L','XL','XXL']).find(z=>Number(p.stock?.[color]?.[z]||0)>0)||p.sizes?.[0]||'M';
-  render();
-}
-$('#applyOfferCoupon').onclick=()=>validateCoupon();
-$('#offerBuy').onclick=async()=>{
-  if(!(await validateCoupon()))return;
-  location.href=`checkout.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(b.offerColor||hintedColor||p.colors?.[0]||'')}&size=${encodeURIComponent(size)}&quantity=1&bannerId=${encodeURIComponent(bid)}&coupon=${encodeURIComponent(coupon)}`;
-};
-load().catch(e=>showError(e.message||'تعذر تحميل العرض'));
-</script>
+const q=new URLSearchParams(location.search),bid=q.get('banner')||'',hintedProduct=q.get('product')||'',hintedPrice=Number(q.get('price')||0),hintedColor=q.get('color')||'';const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],money=n=>new Intl.NumberFormat('ar-EG',{maximumFractionDigits:0}).format(Number(n)||0)+' ج',esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));let b=null,p=null,color='',size='',coupon='';
+async function api(path){const r=await fetch(`${API_URL}${path}`,{headers:{Accept:'application/json'},cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok||d.ok===false)throw Error(d.error||'حدث خطأ');return d}
+function render(){const colors=p.colors?.length?p.colors:[...new Set((p.images||[]).map(x=>x.color).filter(Boolean))];$('#offerColors').innerHTML=colors.map(c=>`<button type="button" class="option ${c===color?'active':''}" data-color="${esc(c)}">${esc(c)}</button>`).join('');$('#offerSizes').innerHTML=(p.sizes||['M','L','XL','XXL']).map(z=>{const q=Number(p.stock?.[color]?.[z]||0);return `<button type="button" class="option ${z===size?'active':''}" data-size="${esc(z)}" ${q<=0?'disabled':''}>${esc(z)}</button>`}).join('');const imgs=(p.images||[]).filter(x=>!x.color||x.color===color);$('#offerImage').src=(imgs[0]||p.images?.[0])?.url||'';const available=Number(p.stock?.[color]?.[size]||0);$('#offerStock').textContent=available?`المتاح: ${available} قطعة`:'نفذت الكمية';$('#offerBuy').disabled=!available;}
+async function reviews(){try{const [{reviews:pr=[]},{reviews:all=[]}]=await Promise.all([api(`/products/${encodeURIComponent(p.id)}/reviews`),api('/reviews')]);const renderList=(list,t)=>t.innerHTML=list.length?list.map(r=>`<article class="review-card"><div class="review-top"><b>${esc(r.name||'عميل AXEL')}</b><span class="stars">${'★'.repeat(Number(r.rating||0))}${'☆'.repeat(5-Number(r.rating||0))}</span></div><p>${esc(r.comment||'')}</p></article>`).join(''):'<p class="empty-state">لا توجد تقييمات حتى الآن</p>';const avg=pr.length?pr.reduce((a,r)=>a+Number(r.rating||0),0)/pr.length:0;$('#reviewSummary').innerHTML=`<div class="review-score"><strong>${avg.toFixed(1)}</strong><span class="stars">${'★'.repeat(Math.round(avg))}${'☆'.repeat(5-Math.round(avg))}</span><small>${pr.length} تقييم</small></div>`;renderList(pr,$('#productReviews'));renderList(all,$('#allReviews'));}catch{}}
+function similar(all){const items=all.filter(x=>x.id!==p.id&&x.category===p.category&&Array.isArray(x.images)&&x.images.length);const fallback=all.filter(x=>x.id!==p.id&&Array.isArray(x.images)&&x.images.length);const list=[...items,...fallback].sort(()=>Math.random()-.5).slice(0,10);$('#similarRail').innerHTML=list.map((x,i)=>`<a class="card product-card reveal-card" href="product.html?id=${encodeURIComponent(x.id)}"><div class="card-media"><img loading="lazy" src="${esc((x.images||[])[Math.floor(Math.random()*x.images.length)]?.url||'')}" alt="${esc(x.name||'منتج AXEL')}"></div><div class="card-body"><b>${esc(x.name||'منتج AXEL')}</b><div class="price">${money(x.salePrice)}</div></div></a>`).join('');}
+function rail(){const el=$('#similarRail');if(!el)return;$$('.similar-section .slider-btn').forEach(()=>{});let down=false,sx=0,ss=0;el.addEventListener('pointerdown',e=>{down=true;sx=e.clientX;ss=el.scrollLeft;el.setPointerCapture?.(e.pointerId)});el.addEventListener('pointermove',e=>{if(down)el.scrollLeft=ss-(e.clientX-sx)});el.addEventListener('pointerup',()=>down=false);}
+async function load(){if(!bid&&!hintedProduct)throw Error('العرض غير موجود');try{if(bid)b=(await api(`/banners/${encodeURIComponent(bid)}`)).banner}catch(e){if(!hintedProduct)throw e;b={id:bid,productId:hintedProduct,offerPrice:hintedPrice,offerColor:hintedColor}}if(!b?.productId)throw Error('لم يتم ربط هذا الفيديو بمنتج');p=(await api(`/products/${encodeURIComponent(b.productId)}`)).product;color=b.offerColor||hintedColor||p.colors?.[0]||p.images?.find(x=>x.color)?.color||'';size=(p.sizes||['M','L','XL','XXL']).find(z=>Number(p.stock?.[color]?.[z]||0)>0)||p.sizes?.[0]||'M';$('#offerName').textContent=p.name||'منتج AXEL';$('#offerPrice').textContent=money(Number(b.offerPrice||hintedPrice||p.salePrice));render();const all=(await api('/products')).products||[];similar(all);rail();await reviews();}
+$('#offerColors').onclick=e=>{const x=e.target.closest('[data-color]');if(x){color=x.dataset.color;size=(p.sizes||[]).find(z=>Number(p.stock?.[color]?.[z]||0)>0)||size;render()}};$('#offerSizes').onclick=e=>{const x=e.target.closest('[data-size]');if(x&&!x.disabled){size=x.dataset.size;render()}};$('#applyOfferCoupon').onclick=async()=>{const code=$('#offerCoupon').value.trim();if(!code){coupon='';$('#offerCouponMsg').textContent='';return}try{const r=await api(`/coupons/validate?code=${encodeURIComponent(code)}&subtotal=${Number(b.offerPrice||hintedPrice||p.salePrice)}&quantity=1&productId=${encodeURIComponent(p.id)}`);coupon=code.toUpperCase();$('#offerCouponMsg').textContent=`تم تطبيق خصم ${money(r.coupon.discount)}`}catch(e){coupon='';$('#offerCouponMsg').textContent=e.message}};$('#offerBuy').onclick=()=>{location.href=`checkout.html?id=${encodeURIComponent(p.id)}&color=${encodeURIComponent(color)}&size=${encodeURIComponent(size)}&quantity=1&bannerId=${encodeURIComponent(bid)}&coupon=${encodeURIComponent(coupon)}`};$('#toggleReviewForm').onclick=()=>{$('#reviewForm').classList.toggle('hidden');$('#toggleReviewForm').textContent=$('#reviewForm').classList.contains('hidden')?'إضافة مراجعة':'إغلاق المراجعة'};$('#reviewForm').onsubmit=async e=>{e.preventDefault();try{const r=await fetch(`${API_URL}/reviews`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({productId:p.id,name:$('#reviewName').value.trim(),rating:Number($('#reviewRating').value),comment:$('#reviewComment').value.trim()})}),d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'تعذر إرسال التقييم');$('#reviewMsg').textContent='تم إضافة رأيك بنجاح';e.target.reset();await reviews()}catch(e){$('#reviewMsg').textContent=e.message}};load().catch(e=>{$('#offerName').textContent=e.message});</script></body></html>
