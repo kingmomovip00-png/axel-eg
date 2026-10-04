@@ -9,7 +9,26 @@ const CART_KEY="axelCartV1";
 function getCart(){try{return JSON.parse(localStorage.getItem(CART_KEY)||"[]")}catch{return []}}
 function setCart(cart){localStorage.setItem(CART_KEY,JSON.stringify(cart));updateCartCount();window.dispatchEvent(new CustomEvent("axel-cart-updated"));}
 function updateCartCount(){const n=getCart().reduce((a,x)=>a+Number(x.quantity||0),0);$$('#cartCount,#cartCountHeader').forEach(x=>x.textContent=n)}
-function addToCart(item){const button=document.querySelector('#addToCart');if(button){button.classList.remove('cart-added');void button.offsetWidth;button.classList.add('cart-added');button.disabled=true;setTimeout(()=>button.disabled=false,500)}const cart=getCart();const key=`${item.productId}|${item.color||''}|${item.size||''}|${item.bannerId||''}`;const found=cart.find(x=>x.key===key);if(found)found.quantity=Math.min(Number(item.max||99),Number(found.quantity||0)+Number(item.quantity||1));else cart.push({...item,key,quantity:Number(item.quantity||1)});setCart(cart);showToast('تمت إضافة المنتج إلى السلة ✓');}
+function addToCart(item){
+  const max=Number(item.max ?? 99);
+  const wanted=Math.max(1,Number(item.quantity||1));
+  if(max<=0){showToast("هذا المقاس غير متاح حالياً",true);return false;}
+  const cart=getCart();
+  const key=`${item.productId}|${item.color||""}|${item.size||""}|${item.bannerId||""}`;
+  const found=cart.find(x=>x.key===key);
+  if(found){
+    const next=Math.min(max,Number(found.quantity||0)+wanted);
+    if(next<=Number(found.quantity||0)){showToast("لا توجد كمية إضافية متاحة",true);return false;}
+    found.quantity=next;
+  }else{
+    cart.push({...item,key,quantity:Math.min(max,wanted)});
+  }
+  setCart(cart);
+  const button=document.querySelector("#addToCart, #offerAddToCart");
+  if(button){button.classList.remove("cart-added");void button.offsetWidth;button.classList.add("cart-added");}
+  showToast("تمت إضافة المنتج إلى السلة ✓");
+  return true;
+}
 
 
 async function publicApi(path) {
