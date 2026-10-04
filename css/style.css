@@ -290,3 +290,27 @@ main, main *, .footer, .footer * { min-width:0; max-width:100%; }
 .footer-cart-link{display:inline-flex!important;align-items:center;gap:7px;color:var(--blue);border-color:var(--line);background:#1d1d1b;margin:0 auto}.footer-cart-link b{min-width:20px;height:20px;border-radius:99px;background:var(--blue);color:#111;display:inline-grid;place-items:center;font-size:11px}.cart-added{animation:cartAdded .45s cubic-bezier(.2,.8,.2,1)}@keyframes cartAdded{0%{transform:scale(1)}35%{transform:scale(1.06);box-shadow:0 0 0 5px #3caeb833,0 12px 30px #0006}70%{transform:scale(.98)}100%{transform:scale(1)}}
 .banner-stage>a>video{display:block;width:100%;height:100%;object-fit:cover;border-radius:inherit;background:#111}
 @media(max-width:600px){.footer-cart-link{margin:0 auto}.footer-inner{gap:14px}}
+/* AXEL V25 — cart/header/similar hard fix */
+.header .nav{position:relative!important;display:flex!important;justify-content:center!important;align-items:center!important;min-height:78px!important}
+.header .nav-left.nav-cart{position:absolute!important;left:18px!important;right:auto!important;top:50%!important;transform:translateY(-50%)!important;display:inline-flex!important;align-items:center!important;z-index:5!important}
+.header .nav-left.nav-cart:hover{transform:translateY(calc(-50% - 2px))!important}
+.header .nav-left.nav-cart img{width:22px!important;height:22px!important;display:block!important;object-fit:contain!important;flex:0 0 22px!important}
+.header .nav-left.nav-cart b{display:inline-grid!important;place-items:center!important}
+.product-actions #addToCart{position:relative;overflow:hidden}
+.product-actions #addToCart.cart-added{animation:axelCartPop .5s cubic-bezier(.2,.8,.2,1)!important}
+@keyframes axelCartPop{0%{transform:scale(1)}35%{transform:scale(1.07);box-shadow:0 0 0 6px #3caeb833,0 14px 35px #0007}70%{transform:scale(.97)}100%{transform:scale(1)}}
+.similar-section{margin-top:8px!important;margin-bottom:8px!important}
+.similar-rail{display:flex!important;direction:rtl!important;overflow-x:auto!important;gap:14px!important;min-height:250px!important}
+.similar-rail .product-card{display:block!important;flex:0 0 clamp(210px,25vw,285px)!important;width:clamp(210px,25vw,285px)!important}
+.similar-rail .card-media{display:block!important;aspect-ratio:4/5!important;min-height:180px!important}
+.similar-rail .card-media img{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important}
+@media(max-width:700px){.header .nav{min-height:68px!important}.header .nav-left.nav-cart{left:10px!important}.header .nav-left.nav-cart img{width:20px!important;height:20px!important}.similar-rail .product-card{flex-basis:58vw!important;width:58vw!important}}
+
+/* FINAL HEADER CART FIX */
+.header .nav { position:relative !important; }
+.header .nav .nav-logo-link { position:absolute !important; left:50% !important; top:50% !important; transform:translate(-50%,-50%) !important; z-index:2 !important; }
+.header .nav .nav-left.nav-cart { position:absolute !important; left:12px !important; right:auto !important; top:50% !important; transform:translateY(-50%) !important; display:inline-flex !important; visibility:visible !important; opacity:1 !important; z-index:10 !important; color:var(--blue) !important; }
+.header .nav .nav-left.nav-cart .cart-header-icon { width:24px !important; height:24px !important; display:block !important; flex:0 0 24px !important; fill:none !important; stroke:var(--blue) !important; stroke-width:1.8 !important; stroke-linecap:round !important; stroke-linejoin:round !important; }
+.header .nav .nav-left.nav-cart span { display:inline !important; }
+.header .nav .nav-left.nav-cart b { display:inline-grid !important; }
+@media (max-width:600px){ .header .nav .nav-left.nav-cart { left:8px !important; } .header .nav .nav-left.nav-cart .cart-header-icon { width:22px !important; height:22px !important; } .header .nav .nav-left.nav-cart span { display:none !important; } }
