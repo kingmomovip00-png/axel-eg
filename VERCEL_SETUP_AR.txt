@@ -26,3 +26,14 @@ APP_URL=https://your-domain.example
 - نجاح الرجوع إلى صفحة الموقع وحده ليس إثباتًا للدفع؛ يجب أن يؤكد السيرفر نتيجة Kashier الموثوقة قبل اعتماد الطلب.
 
 اختبار أولي: افتح /api/health وتأكد من ظهور firebaseAdmin=true وimagekit=true بعد ضبط بياناتهما.
+
+
+طرق الدفع المطلوبة (Kashier فقط)
+- Visa / Mastercard / Meeza: يتم الدفع من صفحة Kashier المستضافة، ويجب أن تكون البطاقات مفعلة في حساب التاجر.
+- Vodafone Cash: اختر "فودافون كاش والمحافظ الإلكترونية"؛ يفتح Kashier واجهة المحفظة ويعرض وسائل المحفظة المتاحة لحسابك. لا يمكن للكود إجبار Kashier على إظهار Vodafone Cash إن لم تكن مفعلة لدى التاجر.
+- Apple Pay: يتطلب HTTPS، وتسجيل نطاق المتجر لدى فريق Kashier، واستلام شهادة Apple Pay ثم نشر ملف apple-developer-merchantid-domain-association.txt على المسار /.well-known/ بهذا الاسم. يظهر زر Apple Pay فقط على جهاز/متصفح متوافقين وبعد تفعيل النطاق والخدمة.
+- InstaPay: يستخدم تكامل Kashier Direct API وFEP. يجب أن تكون InstaPay مفعلة لحساب التاجر. المضيف الافتراضي للإنتاج https://fep.kashier.io وللاختبار https://test-fep.kashier.io. يمكن ضبط KASHIER_FEP_BASE_URL عند الحاجة.
+
+متغيرات Vercel الأساسية: KASHIER_API_BASE_URL=https://api.kashier.io وKASHIER_SECRET_KEY وKASHIER_API_KEY وKASHIER_MERCHANT_ID وAPP_URL (رابط المتجر النهائي) وFIREBASE_SERVICE_ACCOUNT_BASE64. استخدم مفاتيح الاختبار مع مضيفات الاختبار فقط، ومفاتيح الإنتاج مع مضيفات الإنتاج فقط. لا تضع المفاتيح داخل ملفات الواجهة أو المستودع.
+
+ملاحظة: إظهار الطريقة في صفحة الدفع لا يعني أنها مفعلة لدى حساب Kashier؛ يجب تفعيلها واعتماد بيانات الإنتاج من Kashier قبل استقبال مدفوعات حقيقية. اختبر webhook على رابط HTTPS عام وتأكد من وصول حالة SUCCESS من خادم Kashier قبل اعتبار الطلب مدفوعًا.

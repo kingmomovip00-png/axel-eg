@@ -9,7 +9,8 @@
           "css/**",
           "js/**",
           "assets/**",
-          "*.html"
+          "*.html",
+          ".well-known/**"
         ]
       }
     }
