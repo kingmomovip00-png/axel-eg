@@ -100,32 +100,6 @@ const asArray = value => Array.isArray(value) ? value : [];
 const stamp = value => value?.toDate?.().toISOString?.() || value || null;
 const serializeDoc = doc => ({ id: doc.id, ...doc.data() });
 
-function paymobConfigured() {
-  return Boolean(
-    process.env.PAYMOB_BASE_URL &&
-    process.env.PAYMOB_SECRET_KEY &&
-    process.env.PAYMOB_PUBLIC_KEY &&
-    process.env.PAYMOB_HMAC_SECRET &&
-    process.env.PAYMOB_INTEGRATION_ID_CARD
-  );
-}
-
-function paymobBool(value) { return value === true ? "true" : value === false ? "false" : String(value ?? ""); }
-function verifyPaymobHmac(obj, received) {
-  if (!obj || !received || !process.env.PAYMOB_HMAC_SECRET) return false;
-  const fields = [
-    obj.amount_cents, obj.created_at, obj.currency, obj.error_occured,
-    obj.has_parent_transaction, obj.id, obj.integration_id, obj.is_3d_secure,
-    obj.is_auth, obj.is_capture, obj.is_refunded, obj.is_standalone_payment,
-    obj.is_voided, obj.order?.id, obj.owner, obj.pending,
-    obj.source_data?.pan, obj.source_data?.sub_type, obj.source_data?.type, obj.success
-  ];
-  const value = fields.map(paymobBool).join("");
-  const digest = crypto.createHmac("sha512", process.env.PAYMOB_HMAC_SECRET).update(value).digest("hex");
-  try {
-    return digest.length === received.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(received));
-  } catch { return false; }
-}
 
 function splitCustomerName(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -511,49 +485,6 @@ app.post("/api/kashier/webhook", async (req,res)=>{
   }catch(e){console.error("Kashier webhook error",e.message);return res.sendStatus(500);}
 });
 
-app.post("/api/paymob/checkout", async (req, res) => {
-  if (!requireFirebase(res)) return;
-  if (!paymobConfigured()) return res.status(503).json({ ok: false, error: "بوابة Paymob لم تُفعّل بعد. أضف بيانات Paymob الحقيقية إلى متغيرات البيئة أولاً." });
-  const orderId = String(req.body?.orderId || "").trim();
-  if (!orderId) return res.status(400).json({ ok: false, error: "رقم الطلب غير موجود" });
-  try {
-    const ref = db.collection("orders").doc(orderId);
-    const snap = await ref.get();
-    if (!snap.exists) return res.status(404).json({ ok: false, error: "الطلب غير موجود" });
-    const order = snap.data();
-    if (order.paymentMethod !== "Paymob") return res.status(400).json({ ok: false, error: "هذا الطلب ليس دفعه إلكترونية" });
-    const amount = Math.round(Number(order.total || 0) * 100);
-    const integrationId = Number(process.env.PAYMOB_INTEGRATION_ID_CARD);
-    if (!Number.isInteger(integrationId) || integrationId <= 0) return res.status(503).json({ ok: false, error: "PAYMOB_INTEGRATION_ID_CARD غير مضبوط بشكل صحيح" });
-    const customer = splitCustomerName(order.customerName);
-    const appUrl = (process.env.APP_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
-    const base = String(process.env.PAYMOB_BASE_URL).replace(/\/$/, "");
-    const payload = {
-      amount, currency: "EGP", payment_methods: [integrationId],
-      items: [
-        ...(Array.isArray(order.items)&&order.items.length?order.items.map(it=>({name:it.productName||"منتج AXEL",amount:Math.round(Number(it.unitPrice||0)*100),quantity:Number(it.quantity||1),description:`AXEL ${it.color||""} ${it.size||""}`})):[{name:order.productName||"منتج AXEL",amount:Math.round(Number(order.unitPrice||0)*100),quantity:Number(order.quantity||1),description:"AXEL T-shirt"}]),
-        { name: "الشحن", amount: Math.round(Number(order.shipping || 0) * 100), quantity: 1, description: "شحن الطلب" }
-      ],
-      billing_data: { first_name: customer.firstName, last_name: customer.lastName, email: order.email, phone_number: order.phone, apartment: "NA", floor: "NA", street: order.address, building: "NA", shipping_method: "NA", postal_code: "NA", city: "NA", state: "NA", country: "EG" },
-      customer: { first_name: customer.firstName, last_name: customer.lastName, email: order.email },
-      special_reference: order.orderCode,
-      notification_url: `${appUrl}/api/paymob/webhook`,
-      redirection_url: `${appUrl}/checkout.html?payment=return&order=${encodeURIComponent(order.orderCode)}`
-    };
-    const r = await fetch(`${base}/v1/intention/`, { method: "POST", headers: { Authorization: `Token ${process.env.PAYMOB_SECRET_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || !data.client_secret) {
-      console.error("Paymob intention error", r.status, data);
-      return res.status(502).json({ ok: false, error: "تعذر إنشاء عملية الدفع من Paymob. راجع بيانات Paymob وحالة Integration ID." });
-    }
-    await ref.update({ paymobIntentionId: data.id || null, paymobOrderId: data.intention_order_id || data.order_id || null, paymentStatus: "pending", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-    const checkoutUrl = `${base}/unifiedcheckout/?publicKey=${encodeURIComponent(process.env.PAYMOB_PUBLIC_KEY)}&clientSecret=${encodeURIComponent(data.client_secret)}`;
-    res.json({ ok: true, checkoutUrl });
-  } catch (error) {
-    console.error("Paymob checkout error", error.message);
-    res.status(502).json({ ok: false, error: "تعذر الاتصال ببوابة Paymob حالياً" });
-  }
-});
 
 app.get("/api/orders/status", async (req, res) => {
   if (!requireFirebase(res)) return;
@@ -620,48 +551,6 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
   } catch { res.status(500).json({ ok: false, error: "فشل تحميل الإحصائيات" }); }
 });
 
-app.post("/api/paymob/webhook", async (req, res) => {
-  if (!paymobConfigured()) return res.status(503).json({ ok: false, error: "Paymob غير مُعد" });
-  const obj = req.body?.obj;
-  const receivedHmac = String(req.query?.hmac || "");
-  if (!verifyPaymobHmac(obj, receivedHmac)) return res.status(401).json({ ok: false, error: "Invalid Paymob HMAC" });
-   const merchantOrderId=String(obj?.order?.merchant_order_id||"").trim();
-   const paymobOrderId=String(obj?.order?.id||"").trim();
-   if(!merchantOrderId&&!paymobOrderId)return res.status(400).json({ok:false,error:"Paymob order reference missing"});
-   try {
-     let snap=merchantOrderId?await db.collection("orders").where("orderCode","==",merchantOrderId).limit(1).get():{empty:true,docs:[]};
-     if(snap.empty&&paymobOrderId){ snap=await db.collection("orders").where("paymobOrderId","==",Number(paymobOrderId)).limit(1).get(); if(snap.empty)snap=await db.collection("orders").where("paymobOrderId","==",paymobOrderId).limit(1).get(); }
-     if(snap.empty)return res.status(404).json({ok:false,error:"AXEL order not found"});
-    const orderRef = snap.docs[0].ref;
-    const current = snap.docs[0].data();
-    const success = obj.success === true && obj.pending === false;
-    const failed = obj.success === false && obj.pending === false;
-    let changed = false;
-    await db.runTransaction(async tx => {
-      const fresh = await tx.get(orderRef);
-      if (!fresh.exists) throw new Error("ORDER_NOT_FOUND");
-      const order = fresh.data();
-      const patch = { paymobTransactionId: obj.id || null, paymobOrderId: obj.order?.id || null, updatedAt: admin.firestore.FieldValue.serverTimestamp() };
-      if (success && order.paymentStatus !== "paid") { patch.paymentStatus = "paid"; patch.status = order.status === "ملغي" ? "جديد" : order.status; changed = true; }
-      else if (failed && order.paymentStatus !== "failed") {
-        patch.paymentStatus = "failed"; patch.status = "ملغي";
-        if (!order.stockRestored) {
-          if (order.couponCode) { const couponRef=db.collection("coupons").doc(String(order.couponCode).toUpperCase()); const couponSnap=await tx.get(couponRef); if(couponSnap.exists) tx.update(couponRef,{usedCount:admin.firestore.FieldValue.increment(-1),updatedAt:admin.firestore.FieldValue.serverTimestamp()}); }
-          const restoreItems=Array.isArray(order.items)&&order.items.length?order.items:[{productId:order.productId,color:order.color,size:order.size,quantity:order.quantity}];
-          for(const it of restoreItems){const productRef=db.collection("products").doc(it.productId);const productSnap=await tx.get(productRef);if(productSnap.exists){const product=productSnap.data();const stock=structuredClone(product.stock||{});stock[it.color]=stock[it.color]||{};stock[it.color][it.size]=Number(stock[it.color][it.size]||0)+Number(it.quantity||0);tx.update(productRef,{stock,updatedAt:admin.firestore.FieldValue.serverTimestamp()});}}
-          patch.stockRestored = true;
-        }
-        changed = true;
-      }
-      tx.update(orderRef, patch);
-    });
-    if (changed) await notifyTelegram({ ...current, paymentStatus: success ? "paid" : "failed", status: success ? current.status : "ملغي" });
-    res.json({ ok: true, received: true });
-  } catch (error) {
-    console.error("Paymob webhook error", error.message);
-    res.status(500).json({ ok: false, error: "تعذر تحديث حالة الطلب" });
-  }
-});
 
 app.use(express.static(__dirname, { index: "index.html", extensions: ["html"], setHeaders(res){ res.setHeader("Cache-Control", "no-cache, must-revalidate"); } }));
 app.get("*", (req, res) => {
