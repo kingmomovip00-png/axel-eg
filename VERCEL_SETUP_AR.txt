@@ -16,7 +16,7 @@ KASHIER_API_BASE_URL=https://api.kashier.io
 KASHIER_SECRET_KEY
 KASHIER_API_KEY
 KASHIER_MERCHANT_ID
-APP_URL=https://your-domain.example
+APP_URL=https://your-actual-axel-domain.vercel.app
 
 ملاحظات مهمة:
 - لا تضع المفاتيح السرية داخل ملفات JavaScript أو HTML أو مستودع GitHub.
@@ -37,3 +37,11 @@ APP_URL=https://your-domain.example
 متغيرات Vercel الأساسية: KASHIER_API_BASE_URL=https://api.kashier.io وKASHIER_SECRET_KEY وKASHIER_API_KEY وKASHIER_MERCHANT_ID وAPP_URL (رابط المتجر النهائي) وFIREBASE_SERVICE_ACCOUNT_BASE64. استخدم مفاتيح الاختبار مع مضيفات الاختبار فقط، ومفاتيح الإنتاج مع مضيفات الإنتاج فقط. لا تضع المفاتيح داخل ملفات الواجهة أو المستودع.
 
 ملاحظة: إظهار الطريقة في صفحة الدفع لا يعني أنها مفعلة لدى حساب Kashier؛ يجب تفعيلها واعتماد بيانات الإنتاج من Kashier قبل استقبال مدفوعات حقيقية. اختبر webhook على رابط HTTPS عام وتأكد من وصول حالة SUCCESS من خادم Kashier قبل اعتبار الطلب مدفوعًا.
+
+
+سلوك تأكيد الدفع والمخزون (الإصدار الحالي)
+- عند إنشاء الطلب لا يتم خصم المخزون ولا احتساب استخدام الكوبون ولا إرسال إشعار الطلب إلى Telegram.
+- يتم خصم المخزون واحتساب استخدام الكوبون وإرسال إشعار Telegram فقط بعد استقبال webhook ناجح وموقّع من Kashier ومطابقة المبلغ والعملة.
+- عند فشل الدفع، يبقى المخزون كما هو ولا يُرسل إشعار تأكيد الطلب.
+- إذا تم الدفع بنجاح لكن الكمية لم تعد متاحة، يتم تسجيل الحالة للمراجعة اليدوية وإرسال تنبيه في Telegram؛ لا يمكن ضمان حجز الكمية قبل الدفع من دون نظام حجز منفصل.
+- يجب ضبط APP_URL على رابط موقع AXEL الحقيقي المنشور على HTTPS، وليس الرابط التوضيحي الموجود في المثال.
