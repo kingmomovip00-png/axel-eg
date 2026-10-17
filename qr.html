@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1d1d1b">
+  <title>AXEL | كود خصم خاص</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .qr{width:min(460px,92%);margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 0 max(40px,env(safe-area-inset-bottom))}
+    .qr-logo{display:block;width:min(260px,70%);margin:0 auto 6px}
+    .qr h1{font-size:var(--fs-lg);text-align:center;margin:6px 0 4px}
+    .qr-lead{text-align:center;color:var(--muted);margin:0 0 22px;font-size:var(--fs-sm)}
+    .qr-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+    .qr-step{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;transition:border-color .2s,background .2s}
+    .qr-step:last-of-type{margin-bottom:0}
+    .qr-step img{width:26px;height:26px;flex:none;filter:brightness(0) saturate(100%) invert(67%) sepia(29%) saturate(923%) hue-rotate(136deg)}
+    .qr-step div{flex:1;min-width:0}
+    .qr-step b{display:block;font-size:var(--fs-md)}
+    .qr-step small{color:var(--muted);font-size:var(--fs-xs);direction:ltr;display:block;text-align:right}
+    .qr-open{border:1px solid var(--blue);color:var(--blue);background:transparent;border-radius:999px;padding:6px 16px;font-size:var(--fs-sm);cursor:pointer}
+    .qr-step.done{border-color:var(--blue);background:var(--blue-soft)}
+    .qr-step.done .qr-open{background:var(--blue);color:var(--dark)}
+    .qr-bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:14px 0 6px}
+    .qr-bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .35s}
+    .qr-count{text-align:center;color:var(--muted);font-size:var(--fs-xs)}
+    .qr-locked{text-align:center;color:var(--muted);font-size:var(--fs-sm)}
+    .qr-reveal{text-align:center}
+    .qr-code{font-size:34px;letter-spacing:.18em;direction:ltr;color:var(--blue);border:2px dashed var(--blue);border-radius:16px;padding:14px;margin:12px 0}
+    .qr-btn{display:block;width:100%;border:0;border-radius:14px;padding:14px;background:var(--blue);color:var(--dark);font-size:var(--fs-md);cursor:pointer;margin-top:10px}
+    .qr-btn.alt{background:transparent;color:var(--text);border:1px solid var(--line)}
+    .qr-err{color:var(--danger);text-align:center;font-size:var(--fs-sm)}
+  </style>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/seo/favicon-192.png">
+  <link rel="apple-touch-icon" href="/assets/seo/apple-touch-icon.png">
+  <meta property="og:site_name" content="AXEL">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="AXEL | ملابس رجالي">
+  <meta property="og:image" content="https://axel-eg.com/assets/seo/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<main class="qr">
+  <img class="qr-logo" src="assets/logo/logo.png" alt="AXEL">
+  <h1>أهلاً بيك في عالم AXEL</h1>
+  <p class="qr-lead">اضغط على زرار <b>اشترك</b> في كل حساب، وارجع اضغط على اللي بعده. أول ما تخلّص التلاتة اكتب رقم موبايلك وأكّده بكود SMS وهيظهر لك كوبون خصم <b>20%</b> على أول أوردر من الموقع. كل رقم له كوبون واحد، ويُستخدم مرة واحدة.</p>
+
+  <section class="qr-card">
+    <div id="steps"></div>
+    <div class="qr-bar"><i id="bar"></i></div>
+    <div class="qr-count" id="count"></div>
+  </section>
+
+  <section class="qr-card">
+    <div class="qr-locked" id="locked">🔒 اشترك في الحسابات التلاتة فوق عشان كوبون الخصم يظهر</div>
+    <div class="hidden" id="phoneBox" style="text-align:center">
+      <p style="margin:0 0 10px">خلصت الاشتراك! اكتب رقم موبايلك وهنبعتلك كود تأكيد SMS 📱</p>
+      <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" dir="ltr" placeholder="01XXXXXXXXX" maxlength="16" style="width:100%;background:var(--dark);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:13px;font-size:var(--fs-md);text-align:center">
+      <button class="qr-btn" id="sendCode" type="button">ابعتلي كود التأكيد</button>
+    </div>
+    <div class="hidden" id="otpBox" style="text-align:center">
+      <p style="margin:0 0 10px">اكتب الكود اللي وصلك على <b id="otpPhone" dir="ltr"></b></p>
+      <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" placeholder="------" maxlength="6" style="width:100%;background:var(--dark);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:13px;font-size:var(--fs-md);text-align:center">
+      <button class="qr-btn" id="verifyCode" type="button">أكّد وهات الكوبون</button>
+      <button class="qr-btn alt" id="changePhone" type="button">غيّر الرقم</button>
+    </div>
+    <div class="qr-reveal hidden" id="reveal">
+      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#3caeb8" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg><h2 id="rTitle" style="margin:6px 0 0"></h2>
+      <p class="muted" id="rText" style="margin:4px 0 0"></p>
+      <div class="qr-code" id="rCode"></div>
+      <p class="muted" id="rExp" style="margin:0"></p><button class="qr-btn" id="copy" type="button">نسخ الكود</button>
+      <a class="qr-btn alt" id="shop" href="index.html" style="text-align:center">تسوّق دلوقتي</a>
+    </div>
+    <div class="qr-err hidden" id="err"></div>
+  </section>
+</main>
+<script type="module">
+import {API_URL, QR_LINKS, SITE_URL} from "./js/config.js";
+import {auth} from "./js/firebase.js";
+import {RecaptchaVerifier, signInWithPhoneNumber, signOut} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+const $=s=>document.querySelector(s), KEY="axel_qr_done";
+let done=new Set(), claimed=false;
+try{done=new Set(JSON.parse(localStorage.getItem(KEY)||"[]"))}catch{}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify([...done]))}catch{}};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+$("#steps").innerHTML=QR_LINKS.map(l=>`<div class="qr-step" data-id="${l.id}"><img src="${l.icon}" alt=""><div><b>${esc(l.name)}</b><small>${esc(l.handle)}</small></div><button class="qr-open" type="button">اشترك</button></div>`).join("");
+$("#shop").href=SITE_URL||"index.html";
+function render(){
+  QR_LINKS.forEach(l=>{const el=document.querySelector(`[data-id="${l.id}"]`),d=done.has(l.id);el.classList.toggle("done",d);el.querySelector("button").textContent=d?"تم ✓":"اشترك"});
+  const n=done.size,t=QR_LINKS.length;
+  $("#bar").style.width=(n/t*100)+"%";
+  $("#count").textContent=`${n} من ${t}`;
+  if(n===t&&!claimed){claimed=true;$("#locked").classList.add("hidden");$("#phoneBox").classList.remove("hidden");}
+}
+function show(c){
+  $("#rTitle").textContent=`خصم ${c.value}% على أول أوردر`;
+  $("#rText").textContent="كود خاص بيك، بيشتغل مرة واحدة على أي حاجة في الموقع";
+  $("#rCode").textContent=c.code;
+  $("#rExp").textContent=c.expiresAt?`صالح لحد ${new Date(c.expiresAt).toLocaleDateString("ar-EG")}`:"";
+  $("#locked").classList.add("hidden");$("#err").classList.add("hidden");$("#reveal").classList.remove("hidden");
+  $("#copy").onclick=async()=>{try{await navigator.clipboard.writeText(c.code);$("#copy").textContent="اتنسخ ✓"}catch{$("#copy").textContent=c.code}setTimeout(()=>$("#copy").textContent="نسخ الكود",1800)};
+}
+let confirmation=null,verifier=null;
+const showErr=m=>{$("#err").textContent=m;$("#err").classList.remove("hidden")};
+const normPhone=v=>{let d=v.replace(/[٠-٩]/g,x=>"٠١٢٣٤٥٦٧٨٩".indexOf(x)).replace(/\D/g,"");if(d.startsWith("0020"))d="0"+d.slice(4);else if(d.startsWith("20")&&d.length===12)d="0"+d.slice(2);return /^01[0125]\d{8}$/.test(d)?d:""};
+function resetVerifier(){try{verifier&&verifier.clear()}catch{}verifier=null}
+async function sendCode(){
+  $("#err").classList.add("hidden");
+  const p=normPhone($("#phone").value);
+  if(!p)return showErr("اكتب رقم موبايل مصري صحيح (11 رقم يبدأ بـ 01).");
+  const btn=$("#sendCode");btn.disabled=true;btn.textContent="جاري الإرسال...";
+  try{
+    auth.languageCode="ar";
+    resetVerifier();verifier=new RecaptchaVerifier(auth,"sendCode",{size:"invisible"});
+    confirmation=await signInWithPhoneNumber(auth,"+20"+p.slice(1),verifier);
+    $("#otpPhone").textContent=p;$("#phoneBox").classList.add("hidden");$("#otpBox").classList.remove("hidden");
+  }catch(e){
+    resetVerifier();
+    showErr(e.code==="auth/too-many-requests"?"محاولات كتير، جرّب بعد شوية.":e.code==="auth/invalid-phone-number"?"الرقم غير صحيح.":"تعذر إرسال الكود، حاول تاني.");
+  }
+  btn.disabled=false;btn.textContent="ابعتلي كود التأكيد";
+}
+async function verifyAndClaim(){
+  $("#err").classList.add("hidden");
+  const code=$("#otp").value.trim();
+  if(code.length<6)return showErr("اكتب الكود المكوّن من 6 أرقام.");
+  const btn=$("#verifyCode");btn.disabled=true;btn.textContent="لحظة...";
+  try{
+    const cred=await confirmation.confirm(code);
+    const idToken=await cred.user.getIdToken();
+    try{await signOut(auth)}catch{}
+    const r=await fetch(`${API_URL}/coupons/qr`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken})}),d=await r.json();
+    if(!r.ok||!d.ok)throw new Error(d.error||"");
+    $("#otpBox").classList.add("hidden");
+    if(!d.coupon){$("#locked").classList.remove("hidden");$("#locked").textContent=d.reason==="used"?"الرقم ده خد كوبونه قبل كده، وكل رقم له كوبون واحد بس 💙":"العرض متوقف حاليًا، تابعنا قريب 💙";return}
+    show(d.coupon);
+  }catch(e){showErr(e.code==="auth/invalid-verification-code"?"الكود غلط، راجعه وجرّب تاني.":e.code==="auth/code-expired"?"الكود انتهى، اطلب كود جديد.":(e.message||"تعذر تحميل الكوبون، حاول تاني."))}
+  btn.disabled=false;btn.textContent="أكّد وهات الكوبون";
+}
+$("#steps").addEventListener("click",e=>{
+  const row=e.target.closest(".qr-step");if(!row)return;
+  const l=QR_LINKS.find(x=>x.id===row.dataset.id);
+  window.open(l.url,"_blank","noopener");
+  done.add(l.id);save();render();
+});
+$("#sendCode").addEventListener("click",sendCode);
+$("#verifyCode").addEventListener("click",verifyAndClaim);
+$("#changePhone").addEventListener("click",()=>{$("#otpBox").classList.add("hidden");$("#phoneBox").classList.remove("hidden");$("#err").classList.add("hidden")});
+render();
+</script>
+</body>
+</html>

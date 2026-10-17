@@ -392,6 +392,66 @@ app.get("/api/coupons/featured", async (req,res)=>{
   try{const snap=await db.collection("coupons").where("active","==",true).where("showOnHome","==",true).limit(10).get(); const now=Date.now(); const list=snap.docs.map(serializeDoc).filter(c=>!(c.expiresAt&&new Date(c.expiresAt?.seconds?c.expiresAt.seconds*1000:c.expiresAt).getTime()<now)&&(!Number(c.usageLimit||0)||Number(c.usedCount||0)<Number(c.usageLimit||0))); const c=list[0]; if(!c)return res.json({ok:true,coupon:null}); res.json({ok:true,coupon:{code:c.code,type:c.type,value:Number(c.value||0),minOrder:Number(c.minOrder||0),minQuantity:Number(c.minQuantity||1),usageLimit:Number(c.usageLimit||0),usedCount:Number(c.usedCount||0),title:c.promoTitle||"خصم خاص",text:c.promoText||"استخدم الكود عند الطلب"}}); }catch{res.status(500).json({ok:false,error:"تعذر تحميل العرض"});}
 });
 
+// ---------- QR LANDING: one unique single-use coupon per visitor ----------
+const QR_DEFAULTS = { enabled: true, percent: 20, expiryDays: 30 };
+async function getQrSettings(){ try{ const d=await db.collection("settings").doc("qr").get(); return {...QR_DEFAULTS, ...(d.exists?d.data():{})}; }catch{ return {...QR_DEFAULTS}; } }
+app.post("/api/coupons/qr", async (req,res)=>{
+  try{
+    const st=await getQrSettings();
+    if(!st.enabled)return res.json({ok:true,coupon:null,reason:"off"});
+    // The phone number comes from a Firebase-verified SMS login, never from user input.
+    let phone="";
+    try{
+      const decoded=await admin.auth().verifyIdToken(String((req.body||{}).idToken||""));
+      const raw=String(decoded.phone_number||"").replace(/\D/g,"");
+      if(raw.startsWith("20")&&raw.length===12)phone="0"+raw.slice(2);
+    }catch{}
+    if(!/^01[0125]\d{8}$/.test(phone))return res.status(401).json({ok:false,error:"لازم تأكد رقم موبايلك بكود الـ SMS الأول."});
+    const sha=x=>crypto.createHash("sha256").update(x).digest("hex").slice(0,32);
+    const phoneRef=db.collection("qrPhones").doc(phone), now=Date.now();
+    // 1) Same number always gets the same code.
+    const ph=await phoneRef.get();
+    if(ph.exists){
+      const cs=await db.collection("coupons").doc(String(ph.data().code)).get(), c=cs.exists?cs.data():null;
+      const exp=c&&c.expiresAt?new Date(c.expiresAt.toDate?c.expiresAt.toDate():c.expiresAt).getTime():0;
+      if(!c||c.active===false||(Number(c.usageLimit||0)>0&&Number(c.usedCount||0)>=Number(c.usageLimit))||(exp&&exp<now))return res.json({ok:true,coupon:null,reason:"used"});
+      return res.json({ok:true,coupon:{code:c.code,value:Number(c.value||0),expiresAt:exp?new Date(exp).toISOString():null}});
+    }
+    // 2) Safety net against farming fake numbers from one connection.
+    const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
+    const ipRef=db.collection("qrClaims").doc(sha(ip+"|axel-qr")), ipSnap=await ipRef.get();
+    let count=0,start=now;
+    if(ipSnap.exists){const c=ipSnap.data(); if(now-Number(c.start||0)<86400000){count=Number(c.count||0);start=Number(c.start);}}
+    if(count>=5)return res.status(429).json({ok:false,error:"وصلت للحد الأقصى اليوم، جرّب بكرة."});
+    // 3) Create the unique single-use coupon and bind it to the number atomically.
+    const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const percent=Math.min(90,Math.max(1,Number(st.percent||20))), days=Math.max(0,Number(st.expiryDays||0));
+    const expiresAt=days?new Date(now+days*86400000):null;
+    let code="";
+    for(let i=0;i<5;i++){
+      code="AXEL-"+Array.from({length:6},()=>alphabet[crypto.randomInt(alphabet.length)]).join("");
+      if(!(await db.collection("coupons").doc(code).get()).exists)break; code="";
+    }
+    if(!code)throw new Error("code collision");
+    const ts=admin.firestore.FieldValue.serverTimestamp();
+    const out=await db.runTransaction(async tx=>{
+      if((await tx.get(phoneRef)).exists)return {race:true};
+      tx.set(db.collection("coupons").doc(code),{code,type:"percent",value:percent,minOrder:0,minQuantity:1,maxDiscount:0,usageLimit:1,usedCount:0,showOnHome:false,productIds:[],promoTitle:`خصم ${percent}% على أول أوردر`,promoText:"كود خاص من صفحة الـ QR، يُستخدم مرة واحدة",expiresAt,active:true,source:"qr",phone,createdAt:ts,updatedAt:ts});
+      tx.set(phoneRef,{code,createdAt:ts});
+      return {race:false};
+    });
+    if(out.race)return res.json({ok:true,coupon:null,reason:"used"});
+    await ipRef.set({count:count+1,start});
+    res.json({ok:true,coupon:{code,value:percent,expiresAt:expiresAt?expiresAt.toISOString():null}});
+  }catch(e){console.error(e);res.status(500).json({ok:false,error:"تعذر إنشاء الكود، حاول تاني."});}
+});
+app.get("/api/admin/qr-settings", requireAdmin, async (req,res)=>res.json({ok:true,settings:await getQrSettings()}));
+app.put("/api/admin/qr-settings", requireAdmin, async (req,res)=>{
+  const b=req.body||{}, percent=Math.min(90,Math.max(1,Number(b.percent||20))), expiryDays=Math.min(365,Math.max(0,Number(b.expiryDays||0)));
+  await db.collection("settings").doc("qr").set({enabled:b.enabled!==false,percent,expiryDays,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+  res.json({ok:true});
+});
+
 app.get("/api/products/:id/reviews", async (req, res) => {
   if (!requireFirebase(res)) return;
   try { const snap = await db.collection("reviews").where("productId", "==", req.params.id).where("approved", "==", true).get(); const reviews=snap.docs.map(serializeDoc).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0)); res.json({ok:true,reviews}); } catch { res.status(500).json({ok:false,error:"تعذر تحميل التقييمات"}); }
