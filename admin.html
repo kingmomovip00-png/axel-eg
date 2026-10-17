@@ -6,16 +6,6 @@
   <meta name="theme-color" content="#121212">
   <title>AXEL | الإدارة</title>
   <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="192x192" href="/assets/seo/favicon-192.png">
-  <link rel="apple-touch-icon" href="/assets/seo/apple-touch-icon.png">
-  <meta property="og:site_name" content="AXEL">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="AXEL | ملابس رجالي">
-  <meta property="og:image" content="https://axel-eg.com/assets/seo/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
 </head>
 <body class="ax-admin">
   <header class="ax-header">
@@ -144,11 +134,6 @@
       <div class="ax-page-head"><div><h1>كوبونات الخصم</h1><p>أنشئ أكواد الخصم وتحكم في قيمتها وحدود استخدامها.</p></div></div>
       <section class="ax-card">
         <form id="couponForm"><div class="ax-grid two"><label>الكود <input id="couponCode" required maxlength="30" placeholder="AXEL100"></label><label>نوع الخصم <select id="couponType"><option value="percent">نسبة مئوية</option><option value="fixed">مبلغ ثابت</option></select></label><label>قيمة الخصم <input id="couponValue" type="number" min="1" required placeholder="100"></label><label>الحد الأدنى للمبلغ <input id="couponMin" type="number" min="0" value="0"></label><label>أقل عدد قطع <input id="couponMinQty" type="number" min="1" value="2"><small>مثال: 2 = لازم يشتري قطعتين أو أكثر</small></label><label>أقصى خصم <input id="couponMax" type="number" min="0" value="0"></label><label>عدد الاستخدامات المتاح <input id="couponLimit" type="number" min="0" value="10"><small>العدد يقل تلقائيًا بعد كل طلب ناجح</small></label><label>تاريخ الانتهاء <input id="couponExpiry" type="datetime-local"></label><label>المنتجات المشمولة <select id="couponProducts" multiple size="4"><option value="">كل المنتجات</option></select><small>اختياري: لو اخترت منتجات، الكوبون يعمل عليها فقط.</small><label>عنوان العرض في الرئيسية <input id="couponPromoTitle" placeholder="خصم 100 جنيه"></label><label>النص الظاهر للعميل <input id="couponPromoText" placeholder="استخدم الكود وخد خصم 100 جنيه"></label></div><label><input id="couponActive" type="checkbox" checked> الكود فعال</label><label><input id="couponShowHome" type="checkbox"> إظهار الكوبون في الصفحة الرئيسية</label><div class="ax-form-actions"><button class="ax-btn ax-btn-primary" type="submit">إنشاء الكوبون</button></div></form><div id="couponsList" class="ax-manager-list"></div>
-      </section>
-      <section class="ax-card"><h2>كوبون صفحة الـ QR</h2><p class="ax-help">كل زائر يضغط على أزرار السوشيال يتولد له كود خاص به تلقائيًا ويُستخدم مرة واحدة فقط.</p>
-        <div class="ax-grid two"><label>نسبة الخصم % <input id="qrPercent" type="number" min="1" max="90" value="20"></label><label>صلاحية الكود بالأيام (0 = بدون انتهاء) <input id="qrDays" type="number" min="0" max="365" value="30"></label></div>
-        <label><input id="qrEnabled" type="checkbox" checked> تفعيل كوبون الـ QR</label>
-        <div class="ax-form-actions"><button class="ax-btn ax-btn-primary" id="saveQr" type="button">حفظ إعدادات الـ QR</button></div>
       </section>
     </section>
 </main>

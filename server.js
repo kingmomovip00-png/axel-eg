@@ -100,6 +100,32 @@ const asArray = value => Array.isArray(value) ? value : [];
 const stamp = value => value?.toDate?.().toISOString?.() || value || null;
 const serializeDoc = doc => ({ id: doc.id, ...doc.data() });
 
+function paymobConfigured() {
+  return Boolean(
+    process.env.PAYMOB_BASE_URL &&
+    process.env.PAYMOB_SECRET_KEY &&
+    process.env.PAYMOB_PUBLIC_KEY &&
+    process.env.PAYMOB_HMAC_SECRET &&
+    process.env.PAYMOB_INTEGRATION_ID_CARD
+  );
+}
+
+function paymobBool(value) { return value === true ? "true" : value === false ? "false" : String(value ?? ""); }
+function verifyPaymobHmac(obj, received) {
+  if (!obj || !received || !process.env.PAYMOB_HMAC_SECRET) return false;
+  const fields = [
+    obj.amount_cents, obj.created_at, obj.currency, obj.error_occured,
+    obj.has_parent_transaction, obj.id, obj.integration_id, obj.is_3d_secure,
+    obj.is_auth, obj.is_capture, obj.is_refunded, obj.is_standalone_payment,
+    obj.is_voided, obj.order?.id, obj.owner, obj.pending,
+    obj.source_data?.pan, obj.source_data?.sub_type, obj.source_data?.type, obj.success
+  ];
+  const value = fields.map(paymobBool).join("");
+  const digest = crypto.createHmac("sha512", process.env.PAYMOB_HMAC_SECRET).update(value).digest("hex");
+  try {
+    return digest.length === received.length && crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(received));
+  } catch { return false; }
+}
 
 function splitCustomerName(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -111,7 +137,7 @@ async function notifyTelegram(order) {
   if (!token || !chatId) return;
   const items = Array.isArray(order.items) && order.items.length ? order.items : [{productName:order.productName,color:order.color,size:order.size,quantity:order.quantity}];
   const itemText = items.map((it,i)=>`${i+1}) ${it.productName||"منتج AXEL"} — ${it.color||""} — ${it.size||""} × ${Number(it.quantity||1)}`).join("\n");
-  const text = ["🛍️ طلب جديد - AXEL",`رقم الطلب: ${order.orderCode}`,`العميل: ${order.customerName}`,`الهاتف: ${order.phone}`,`المنتجات:\n${itemText}`,`الإجمالي: ${order.total} جنيه`,`الخصم: ${order.discount||0} جنيه`,order.couponCode?`الكوبون: ${order.couponCode}`:"",`طريقة الدفع: ${order.paymentMethod}`,`حالة الدفع: ${order.paymentStatus}`,order.inventoryStatus === "needs_review" ? "⚠️ تنبيه: الدفع تم لكن المخزون يحتاج مراجعة يدوية" : "",`العنوان: ${order.address}`].filter(Boolean).join("\n");
+  const text = ["🛍️ طلب جديد - AXEL",`رقم الطلب: ${order.orderCode}`,`العميل: ${order.customerName}`,`الهاتف: ${order.phone}`,`المنتجات:\n${itemText}`,`الإجمالي: ${order.total} جنيه`,`الخصم: ${order.discount||0} جنيه`,order.couponCode?`الكوبون: ${order.couponCode}`:"",`طريقة الدفع: ${order.paymentMethod}`,`حالة الدفع: ${order.paymentStatus}`,`العنوان: ${order.address}`].filter(Boolean).join("\n");
   try { const imageUrl=String(order.imageUrl||items[0]?.imageUrl||"").trim(); const endpoint=imageUrl?"sendPhoto":"sendMessage"; const body=imageUrl?{chat_id:chatId,photo:imageUrl,caption:text}:{chat_id:chatId,text}; await fetch(`https://api.telegram.org/bot${token}/${endpoint}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); } catch(error){ console.error("Telegram notification failed:",error.message); }
 }
 
@@ -177,18 +203,19 @@ app.get("/api/banners/:id", async (req, res) => {
 
 // ---------- KASHIER PAYMENT METHODS ----------
 app.get("/api/kashier/payment-methods", async (req, res) => {
-  const secretKey = env("KASHIER_SECRET_KEY"), apiKey = env("KASHIER_API_KEY"), merchantId = env("KASHIER_MERCHANT_ID");
-  if (!secretKey || !apiKey || !merchantId) return res.json({ ok: true, configured: false, methods: [] });
+  const secretKey = env("KASHIER_SECRET_KEY");
+  const apiKey = env("KASHIER_API_KEY");
+  const merchantId = env("KASHIER_MERCHANT_ID");
   const base = env("KASHIER_API_BASE_URL", "https://api.kashier.io").replace(/\/$/, "");
+  if (!secretKey || !apiKey || !merchantId) return res.json({ ok: true, configured: false, methods: [] });
   try {
     const r = await fetch(`${base}/v2/merchants/${encodeURIComponent(merchantId)}/paymentMethods`, { headers: { Authorization: secretKey, "api-key": apiKey, Accept: "application/json" } });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) return res.status(502).json({ ok: false, error: data?.message || "تعذر قراءة طرق الدفع من Kashier" });
     const methods = [];
-    if (data.card !== false) methods.push({ id: "card", title: "فيزا / ماستركارد / ميزة", subtitle: "دفع آمن بالبطاقات عبر Kashier", icon: "assets/icons/visa.svg" });
-    if (data.wallet !== false) methods.push({ id: "wallet", title: "فودافون كاش والمحافظ الإلكترونية", subtitle: "اختيار المحفظة ورقم الهاتف يتم داخل Kashier", icon: "assets/icons/vodafone-cash.svg" });
-    methods.push({ id: "applepay", title: "Apple Pay", subtitle: "يحتاج جهازًا ومتصفحًا داعمين وتفعيل نطاق المتجر لدى Kashier", icon: "assets/icons/apple-pay.svg" });
-    methods.push({ id: "instapay", title: "InstaPay", subtitle: "الدفع عبر QR من خلال خدمة InstaPay لدى Kashier", icon: "assets/icons/instapay.svg" });
+    if (data.card) methods.push({ id: "card", title: "بطاقات بنكية", subtitle: "Visa / Mastercard / Meeza", icon: "assets/icons/visa.svg" });
+    if (data.wallet) methods.push({ id: "wallet", title: "المحافظ الإلكترونية", subtitle: "الدفع بالمحفظة عبر Kashier", icon: "assets/icons/vodafone-cash.svg" });
+    if (data.bank_installments) methods.push({ id: "bank_installments", title: "تقسيط بنكي", subtitle: "البنوك المتاحة في حساب Kashier", icon: "assets/icons/visa.svg" });
     res.json({ ok: true, configured: true, methods });
   } catch { res.status(502).json({ ok: false, error: "تعذر الاتصال بـ Kashier" }); }
 });
@@ -363,6 +390,52 @@ app.post("/api/admin/offers", requireAdmin, async (req, res) => {
   res.status(201).json({ ok: true, id: ref.id });
 });
 
+// ---------- QR SOCIAL COUPON: one verified phone number, one lifetime claim ----------
+function normalizePhoneForClaim(value) {
+  let digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0") && digits.length === 11) digits = "20" + digits.slice(1);
+  if (digits.length === 10 && digits.startsWith("1")) digits = "20" + digits;
+  return digits;
+}
+function phoneClaimHash(phone) {
+  return crypto.createHash("sha256").update(normalizePhoneForClaim(phone)).digest("hex");
+}
+app.post("/api/qr-coupons/claim", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return res.status(401).json({ ok:false, error:"أكد رقم هاتفك أولًا" });
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    const phone = String(decoded.phone_number || "");
+    const normalized = normalizePhoneForClaim(phone);
+    if (!phone || normalized.length < 10) return res.status(403).json({ok:false,error:"لازم تأكد رقم هاتفك برسالة SMS أولًا"});
+    const phoneHash = phoneClaimHash(phone);
+    const claimRef = db.collection("qrCouponClaims").doc(phoneHash);
+    const code = "AXEL" + crypto.randomBytes(4).toString("hex").toUpperCase();
+    const couponRef = db.collection("coupons").doc(code);
+    const existing = await claimRef.get();
+    if (existing.exists) return res.status(409).json({ok:false,error:"رقم الهاتف ده حصل بالفعل على كوبون AXEL",code:existing.data().code});
+    await db.runTransaction(async tx => {
+      const claimSnap = await tx.get(claimRef);
+      const couponSnap = await tx.get(couponRef);
+      if (claimSnap.exists) throw new Error("PHONE_ALREADY_CLAIMED");
+      if (couponSnap.exists) throw new Error("CODE_COLLISION");
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      tx.set(couponRef, { code, type:"percent", value:20, minOrder:0, minQuantity:1, maxDiscount:0, usageLimit:1, usedCount:0, showOnHome:false, productIds:[], promoTitle:"خصم 20% من AXEL", promoText:"خصم 20% على أول أوردر", active:true, phoneCoupon:true, phoneHash, claimedPhoneLast4:normalized.slice(-4), createdAt:now, updatedAt:now });
+      tx.create(claimRef, { code, phoneHash, createdAt:now, uid:decoded.uid });
+    });
+    return res.status(201).json({ok:true, code, discount:20, message:"مبروك! ده كوبونك الخاص"});
+  } catch (error) {
+    if (error.message === "PHONE_ALREADY_CLAIMED") {
+      try { const decoded = await admin.auth().verifyIdToken(token); const ref = db.collection("qrCouponClaims").doc(phoneClaimHash(decoded.phone_number)); const snap = await ref.get(); return res.status(409).json({ok:false,error:"رقم الهاتف ده حصل بالفعل على كوبون AXEL",code:snap.data()?.code||null}); } catch {}
+    }
+    console.error("QR coupon claim failed:", error.message);
+    return res.status(500).json({ok:false,error:"حصلت مشكلة وإحنا بنجهز الكوبون. جرّب تاني بعد شوية"});
+  }
+});
+
 // ---------- COUPONS ----------
 app.get("/api/coupons/validate", async (req, res) => {
   if (!requireFirebase(res)) return;
@@ -392,66 +465,6 @@ app.get("/api/coupons/featured", async (req,res)=>{
   try{const snap=await db.collection("coupons").where("active","==",true).where("showOnHome","==",true).limit(10).get(); const now=Date.now(); const list=snap.docs.map(serializeDoc).filter(c=>!(c.expiresAt&&new Date(c.expiresAt?.seconds?c.expiresAt.seconds*1000:c.expiresAt).getTime()<now)&&(!Number(c.usageLimit||0)||Number(c.usedCount||0)<Number(c.usageLimit||0))); const c=list[0]; if(!c)return res.json({ok:true,coupon:null}); res.json({ok:true,coupon:{code:c.code,type:c.type,value:Number(c.value||0),minOrder:Number(c.minOrder||0),minQuantity:Number(c.minQuantity||1),usageLimit:Number(c.usageLimit||0),usedCount:Number(c.usedCount||0),title:c.promoTitle||"خصم خاص",text:c.promoText||"استخدم الكود عند الطلب"}}); }catch{res.status(500).json({ok:false,error:"تعذر تحميل العرض"});}
 });
 
-// ---------- QR LANDING: one unique single-use coupon per visitor ----------
-const QR_DEFAULTS = { enabled: true, percent: 20, expiryDays: 30 };
-async function getQrSettings(){ try{ const d=await db.collection("settings").doc("qr").get(); return {...QR_DEFAULTS, ...(d.exists?d.data():{})}; }catch{ return {...QR_DEFAULTS}; } }
-app.post("/api/coupons/qr", async (req,res)=>{
-  try{
-    const st=await getQrSettings();
-    if(!st.enabled)return res.json({ok:true,coupon:null,reason:"off"});
-    // The phone number comes from a Firebase-verified SMS login, never from user input.
-    let phone="";
-    try{
-      const decoded=await admin.auth().verifyIdToken(String((req.body||{}).idToken||""));
-      const raw=String(decoded.phone_number||"").replace(/\D/g,"");
-      if(raw.startsWith("20")&&raw.length===12)phone="0"+raw.slice(2);
-    }catch{}
-    if(!/^01[0125]\d{8}$/.test(phone))return res.status(401).json({ok:false,error:"لازم تأكد رقم موبايلك بكود الـ SMS الأول."});
-    const sha=x=>crypto.createHash("sha256").update(x).digest("hex").slice(0,32);
-    const phoneRef=db.collection("qrPhones").doc(phone), now=Date.now();
-    // 1) Same number always gets the same code.
-    const ph=await phoneRef.get();
-    if(ph.exists){
-      const cs=await db.collection("coupons").doc(String(ph.data().code)).get(), c=cs.exists?cs.data():null;
-      const exp=c&&c.expiresAt?new Date(c.expiresAt.toDate?c.expiresAt.toDate():c.expiresAt).getTime():0;
-      if(!c||c.active===false||(Number(c.usageLimit||0)>0&&Number(c.usedCount||0)>=Number(c.usageLimit))||(exp&&exp<now))return res.json({ok:true,coupon:null,reason:"used"});
-      return res.json({ok:true,coupon:{code:c.code,value:Number(c.value||0),expiresAt:exp?new Date(exp).toISOString():null}});
-    }
-    // 2) Safety net against farming fake numbers from one connection.
-    const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
-    const ipRef=db.collection("qrClaims").doc(sha(ip+"|axel-qr")), ipSnap=await ipRef.get();
-    let count=0,start=now;
-    if(ipSnap.exists){const c=ipSnap.data(); if(now-Number(c.start||0)<86400000){count=Number(c.count||0);start=Number(c.start);}}
-    if(count>=5)return res.status(429).json({ok:false,error:"وصلت للحد الأقصى اليوم، جرّب بكرة."});
-    // 3) Create the unique single-use coupon and bind it to the number atomically.
-    const alphabet="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const percent=Math.min(90,Math.max(1,Number(st.percent||20))), days=Math.max(0,Number(st.expiryDays||0));
-    const expiresAt=days?new Date(now+days*86400000):null;
-    let code="";
-    for(let i=0;i<5;i++){
-      code="AXEL-"+Array.from({length:6},()=>alphabet[crypto.randomInt(alphabet.length)]).join("");
-      if(!(await db.collection("coupons").doc(code).get()).exists)break; code="";
-    }
-    if(!code)throw new Error("code collision");
-    const ts=admin.firestore.FieldValue.serverTimestamp();
-    const out=await db.runTransaction(async tx=>{
-      if((await tx.get(phoneRef)).exists)return {race:true};
-      tx.set(db.collection("coupons").doc(code),{code,type:"percent",value:percent,minOrder:0,minQuantity:1,maxDiscount:0,usageLimit:1,usedCount:0,showOnHome:false,productIds:[],promoTitle:`خصم ${percent}% على أول أوردر`,promoText:"كود خاص من صفحة الـ QR، يُستخدم مرة واحدة",expiresAt,active:true,source:"qr",phone,createdAt:ts,updatedAt:ts});
-      tx.set(phoneRef,{code,createdAt:ts});
-      return {race:false};
-    });
-    if(out.race)return res.json({ok:true,coupon:null,reason:"used"});
-    await ipRef.set({count:count+1,start});
-    res.json({ok:true,coupon:{code,value:percent,expiresAt:expiresAt?expiresAt.toISOString():null}});
-  }catch(e){console.error(e);res.status(500).json({ok:false,error:"تعذر إنشاء الكود، حاول تاني."});}
-});
-app.get("/api/admin/qr-settings", requireAdmin, async (req,res)=>res.json({ok:true,settings:await getQrSettings()}));
-app.put("/api/admin/qr-settings", requireAdmin, async (req,res)=>{
-  const b=req.body||{}, percent=Math.min(90,Math.max(1,Number(b.percent||20))), expiryDays=Math.min(365,Math.max(0,Number(b.expiryDays||0)));
-  await db.collection("settings").doc("qr").set({enabled:b.enabled!==false,percent,expiryDays,updatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
-  res.json({ok:true});
-});
-
 app.get("/api/products/:id/reviews", async (req, res) => {
   if (!requireFirebase(res)) return;
   try { const snap = await db.collection("reviews").where("productId", "==", req.params.id).where("approved", "==", true).get(); const reviews=snap.docs.map(serializeDoc).sort((a,b)=>Number(b.createdAt?.seconds||0)-Number(a.createdAt?.seconds||0)); res.json({ok:true,reviews}); } catch { res.status(500).json({ok:false,error:"تعذر تحميل التقييمات"}); }
@@ -474,284 +487,117 @@ app.delete("/api/admin/coupons/:id", requireAdmin, async (req,res)=>{ await db.c
 // ---------- ORDERS ----------
 app.post("/api/orders", async (req, res) => {
   if (!requireFirebase(res)) return;
-  const body = req.body || {};
-  const items = Array.isArray(body.items) && body.items.length
-    ? body.items.map(x => ({
-        productId: String(x.productId || ""), color: String(x.color || ""),
-        size: String(x.size || ""), quantity: Math.max(1, Math.min(20, Number(x.quantity) || 1)),
-        bannerId: String(x.bannerId || "")
-      })).filter(x => x.productId && x.color && x.size)
-    : [{ productId: String(body.productId || ""), color: String(body.color || ""),
-         size: String(body.size || ""), quantity: Math.max(1, Math.min(20, Number(body.quantity) || 1)),
-         bannerId: String(body.bannerId || "") }].filter(x => x.productId && x.color && x.size);
-  const { customerName, phone, email, address, paymentMethod = "", couponCode = "" } = body;
-  const onlineMethods = ["card", "wallet", "applepay", "instapay"];
-  if (!items.length || !customerName || !phone || !email || !address)
-    return res.status(400).json({ ok: false, error: "أكمل بيانات العميل والمنتجات" });
-  if (!onlineMethods.includes(String(paymentMethod)))
-    return res.status(400).json({ ok: false, error: "اختر طريقة دفع متاحة عبر Kashier" });
-
+  const body=req.body||{};
+  const items=Array.isArray(body.items)&&body.items.length?body.items.map(x=>({productId:String(x.productId||""),color:String(x.color||""),size:String(x.size||""),quantity:Math.max(1,Math.min(20,Number(x.quantity)||1)),bannerId:String(x.bannerId||"")})).filter(x=>x.productId&&x.color&&x.size):[{productId:String(body.productId||""),color:String(body.color||""),size:String(body.size||""),quantity:Math.max(1,Math.min(20,Number(body.quantity)||1)),bannerId:String(body.bannerId||"")}].filter(x=>x.productId&&x.color&&x.size);
+  const { customerName, phone, email, address, paymentMethod = "غير محدد", couponCode = "" } = body;
+  if (!items.length || !customerName || !phone || !email || !address) return res.status(400).json({ ok: false, error: "أكمل بيانات العميل والمنتجات" });
   try {
-    const orderCode = makeOrderCode();
-    const orderRef = db.collection("orders").doc();
-    let orderData;
-    await db.runTransaction(async tx => {
-      const productRefs = [...new Map(items.map(i => [i.productId, db.collection("products").doc(i.productId)])).values()];
-      const productSnaps = [];
-      for (const ref of productRefs) productSnaps.push(await tx.get(ref));
-      const productById = new Map(productRefs.map((ref, i) => [ref.id, productSnaps[i]]));
-      const bannerIds = [...new Set(items.map(i => i.bannerId).filter(Boolean))];
-      const bannerRefs = bannerIds.map(id => db.collection("banners").doc(id));
-      const bannerSnaps = [];
-      for (const ref of bannerRefs) bannerSnaps.push(await tx.get(ref));
-      const bannerById = new Map(bannerRefs.map((ref, i) => [ref.id, bannerSnaps[i]]));
-      const code = String(couponCode || "").trim().toUpperCase();
-      const couponRef = code ? db.collection("coupons").doc(code) : null;
-      const couponSnap = couponRef ? await tx.get(couponRef) : null;
-
-      // Validate total requested quantity per variant, including duplicate cart lines.
-      const demand = new Map();
-      for (const it of items) {
-        const key = `${it.productId}::${it.color}::${it.size}`;
-        demand.set(key, (demand.get(key) || 0) + it.quantity);
+    const orderCode=makeOrderCode(); let orderData;
+    const orderRef=await db.runTransaction(async tx=>{
+      const productRefs=items.map(i=>db.collection("products").doc(i.productId));
+      const snaps=[]; for(const ref of productRefs) snaps.push(await tx.get(ref));
+      const prepared=[]; let subtotal=0;
+      for(let i=0;i<items.length;i++){
+        const it=items[i], snap=snaps[i]; if(!snap.exists)throw new Error("PRODUCT_NOT_FOUND"); const p=snap.data(); if(p.active===false)throw new Error("PRODUCT_INACTIVE");
+        const available=Number(p.stock?.[it.color]?.[it.size]||0); if(available<it.quantity)throw new Error("OUT_OF_STOCK");
+        let unitPrice=Number(p.salePrice||0), offerApplied=false;
+        if(it.bannerId){const bs=await tx.get(db.collection("banners").doc(it.bannerId));const b=bs.exists?bs.data():null;if(!b||b.active===false||String(b.productId||"")!==it.productId||Number(b.offerPrice||0)<=0)throw new Error("INVALID_BANNER_OFFER");unitPrice=Number(b.offerPrice);offerApplied=true;}
+        const nextStock=structuredClone(p.stock||{}); nextStock[it.color]=nextStock[it.color]||{}; nextStock[it.color][it.size]=available-it.quantity; tx.update(productRefs[i],{stock:nextStock,updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+        subtotal+=unitPrice*it.quantity; prepared.push({productId:it.productId,productName:p.name||"منتج AXEL",imageUrl:p.images?.find(x=>x.color===it.color)?.url||p.images?.[0]?.url||"",color:it.color,size:it.size,quantity:it.quantity,unitPrice,offerApplied,bannerId:it.bannerId});
       }
-      for (const [key, qty] of demand) {
-        const [productId, color, size] = key.split("::");
-        const snap = productById.get(productId);
-        if (!snap?.exists) throw new Error("PRODUCT_NOT_FOUND");
-        const product = snap.data();
-        if (product.active === false) throw new Error("PRODUCT_INACTIVE");
-        const available = Number(product.stock?.[color]?.[size] || 0);
-        if (available < qty) throw new Error("OUT_OF_STOCK");
-      }
-
-      const prepared = [];
-      let subtotal = 0;
-      for (const it of items) {
-        const product = productById.get(it.productId).data();
-        let unitPrice = Number(product.salePrice || 0), offerApplied = false;
-        if (it.bannerId) {
-          const bs = bannerById.get(it.bannerId);
-          const banner = bs?.exists ? bs.data() : null;
-          if (!banner || banner.active === false || String(banner.productId || "") !== it.productId || Number(banner.offerPrice || 0) <= 0)
-            throw new Error("INVALID_BANNER_OFFER");
-          unitPrice = Number(banner.offerPrice);
-          offerApplied = true;
-        }
-        subtotal += unitPrice * it.quantity;
-        prepared.push({
-          productId: it.productId, productName: product.name || "منتج AXEL",
-          imageUrl: product.images?.find(x => x.color === it.color)?.url || product.images?.[0]?.url || "",
-          color: it.color, size: it.size, quantity: it.quantity, unitPrice, offerApplied, bannerId: it.bannerId
-        });
-      }
-
-      const shipping = Number(process.env.SHIPPING_PRICE || 50);
-      let discount = 0, appliedCoupon = "";
-      if (couponRef) {
-        if (!couponSnap?.exists) throw new Error("COUPON_INVALID");
-        const c = couponSnap.data(), now = Date.now();
-        const totalQty = prepared.reduce((a, x) => a + x.quantity, 0);
-        if (c.active === false || (c.expiresAt && new Date(c.expiresAt.toDate ? c.expiresAt.toDate() : c.expiresAt).getTime() < now) || (Number(c.usageLimit || 0) > 0 && Number(c.usedCount || 0) >= Number(c.usageLimit))) throw new Error("COUPON_INVALID");
-        if (subtotal < Number(c.minOrder || 0)) throw new Error("COUPON_MIN_ORDER");
-        if (totalQty < Number(c.minQuantity || 1)) throw new Error("COUPON_MIN_QTY");
-        if (Array.isArray(c.productIds) && c.productIds.length && !prepared.some(x => c.productIds.includes(x.productId))) throw new Error("COUPON_PRODUCT");
-        discount = c.type === "fixed" ? Math.min(subtotal, Number(c.value || 0)) : subtotal * Math.min(100, Number(c.value || 0)) / 100;
-        if (Number(c.maxDiscount || 0) > 0) discount = Math.min(discount, Number(c.maxDiscount));
-        discount = Math.max(0, Math.round(discount * 100) / 100);
-        appliedCoupon = code;
-      }
-      const total = Math.max(0, subtotal - discount + shipping);
-      const first = prepared[0];
-      orderData = {
-        orderCode, items: prepared, productId: first.productId, productName: first.productName,
-        imageUrl: first.imageUrl, color: first.color, size: first.size, quantity: first.quantity,
-        unitPrice: first.unitPrice, offerApplied: first.offerApplied, bannerId: first.bannerId,
-        couponCode: appliedCoupon, discount, customerName: String(customerName).trim(),
-        phone: String(phone).trim(), email: String(email).trim().toLowerCase(), address: String(address).trim(),
-        paymentMethod, paymentStatus: "pending", status: "جديد", subtotal, shipping, total,
-        inventoryDeducted: false, couponUsageRecorded: false, inventoryStatus: "pending_payment",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(), updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-      // Critical: don't deduct stock, consume a coupon, or notify Telegram until Kashier confirms payment.
-      tx.set(orderRef, orderData);
+      const shipping=Number(process.env.SHIPPING_PRICE||50); let discount=0,appliedCoupon="";
+      if(couponCode){const code=String(couponCode).trim().toUpperCase(),cs=await tx.get(db.collection("coupons").doc(code));if(!cs.exists)throw new Error("COUPON_INVALID");const c=cs.data(),now=Date.now(),totalQty=prepared.reduce((a,x)=>a+x.quantity,0);if(c.active===false||(c.expiresAt&&new Date(c.expiresAt.toDate?c.expiresAt.toDate():c.expiresAt).getTime()<now)||(Number(c.usageLimit||0)>0&&Number(c.usedCount||0)>=Number(c.usageLimit)))throw new Error("COUPON_INVALID");if(c.phoneCoupon&&(!c.phoneHash||phoneClaimHash(phone)!==c.phoneHash))throw new Error("COUPON_PHONE_MISMATCH");if(subtotal<Number(c.minOrder||0))throw new Error("COUPON_MIN_ORDER");if(totalQty<Number(c.minQuantity||1))throw new Error("COUPON_MIN_QTY"); if(Array.isArray(c.productIds)&&c.productIds.length&&!prepared.some(x=>c.productIds.includes(x.productId)))throw new Error("COUPON_PRODUCT"); discount=c.type==='fixed'?Math.min(subtotal,Number(c.value||0)):subtotal*Math.min(100,Number(c.value||0))/100;if(Number(c.maxDiscount||0)>0)discount=Math.min(discount,Number(c.maxDiscount));discount=Math.max(0,Math.round(discount*100)/100);appliedCoupon=code;tx.update(cs.ref,{usedCount:admin.firestore.FieldValue.increment(1),updatedAt:admin.firestore.FieldValue.serverTimestamp()});}
+      const total=Math.max(0,subtotal-discount+shipping); const first=prepared[0];
+      orderData={orderCode,items:prepared,productId:first.productId,productName:first.productName,imageUrl:first.imageUrl,color:first.color,size:first.size,quantity:first.quantity,unitPrice:first.unitPrice,offerApplied:first.offerApplied,bannerId:first.bannerId,couponCode:appliedCoupon,discount,customerName:String(customerName).trim(),phone:String(phone).trim(),email:String(email).trim().toLowerCase(),address:String(address).trim(),paymentMethod,paymentStatus:"pending",status:"جديد",subtotal,shipping,total,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()};
+      const ref=db.collection("orders").doc();tx.set(ref,orderData);return ref;
     });
-    return res.status(201).json({ ok: true, orderId: orderRef.id, orderCode, total: orderData.total, paymentStatus: "pending" });
-  } catch (error) {
-    const map = {
-      PRODUCT_NOT_FOUND: "المنتج غير موجود", PRODUCT_INACTIVE: "هناك منتج غير متاح حالياً",
-      OUT_OF_STOCK: "إحدى الكميات المطلوبة غير متاحة", INVALID_BANNER_OFFER: "العرض المرتبط بالبانر غير صالح",
-      COUPON_INVALID: "كود الخصم غير صالح أو منتهي أو استنفد عدد استخداماته",
-      COUPON_MIN_ORDER: "الحد الأدنى للطلب لاستخدام الكود لم يتحقق",
-      COUPON_MIN_QTY: "يجب شراء عدد القطع المطلوب للكوبون", COUPON_PRODUCT: "كود الخصم غير متاح للمنتجات المختارة"
-    };
-    console.error("Create order error:", error.message);
-    return res.status(400).json({ ok: false, error: map[error.message] || "فشل إنشاء الطلب" });
-  }
+    await notifyTelegram({...orderData,id:orderRef.id});res.status(201).json({ok:true,orderId:orderRef.id,orderCode,total:orderData.total,paymentStatus:orderData.paymentStatus});
+  }catch(error){const map={PRODUCT_NOT_FOUND:"المنتج غير موجود",PRODUCT_INACTIVE:"هناك منتج غير متاح حالياً",OUT_OF_STOCK:"إحدى الكميات المطلوبة غير متاحة",INVALID_BANNER_OFFER:"العرض المرتبط بالبانر غير صالح",COUPON_INVALID:"كود الخصم غير صالح أو منتهي أو استنفد عدد استخداماته",COUPON_MIN_ORDER:"الحد الأدنى للطلب لاستخدام الكود لم يتحقق",COUPON_MIN_QTY:"يجب شراء عدد القطع المطلوب للكوبون",COUPON_PRODUCT:"كود الخصم غير متاح للمنتجات المختارة",COUPON_PHONE_MISMATCH:"الكوبون ده مرتبط برقم الهاتف اللي استلمه؛ اكتب نفس الرقم في الطلب"};res.status(400).json({ok:false,error:map[error.message]||"فشل إنشاء الطلب"});}
 });
 
 app.post("/api/kashier/checkout", async (req, res) => {
   const secretKey = env("KASHIER_SECRET_KEY"), apiKey = env("KASHIER_API_KEY"), merchantId = env("KASHIER_MERCHANT_ID");
   if (!secretKey || !apiKey || !merchantId) return res.status(503).json({ ok:false, error:"بوابة Kashier لم تُفعّل بعد. أضف KASHIER_SECRET_KEY وKASHIER_API_KEY وKASHIER_MERCHANT_ID في Vercel." });
   const orderId = String(req.body?.orderId||"").trim(), method = String(req.body?.method||"").trim();
-  if (!orderId || !["card","wallet","applepay","instapay"].includes(method)) return res.status(400).json({ok:false,error:"بيانات الدفع غير مكتملة"});
-  if (!requireFirebase(res)) return;
+  if (!orderId || !["card","wallet"].includes(method)) return res.status(400).json({ok:false,error:"بيانات الدفع غير مكتملة"});
   try {
     const ref=db.collection("orders").doc(orderId), snap=await ref.get(); if(!snap.exists)return res.status(404).json({ok:false,error:"الطلب غير موجود"});
     const order=snap.data();
     if(order.paymentStatus==='paid')return res.status(400).json({ok:false,error:"الطلب مدفوع بالفعل"});
-    const configuredAppUrl = env("APP_URL");
-    let appUrl;
-    try {
-      if (!configuredAppUrl) throw new Error("APP_URL is missing");
-      const parsedAppUrl = new URL(configuredAppUrl);
-      if (parsedAppUrl.protocol !== "https:" || parsedAppUrl.username || parsedAppUrl.password || parsedAppUrl.search || parsedAppUrl.hash)
-        throw new Error("APP_URL must be a clean HTTPS site URL");
-      appUrl = parsedAppUrl.origin;
-    } catch {
-      return res.status(503).json({ ok: false, error: "APP_URL غير صالح. ضع رابط موقع AXEL الحقيقي كاملًا ويبدأ بـ https:// داخل Vercel." });
-    }
-    const apiBase=env("KASHIER_API_BASE_URL","https://api.kashier.io").replace(/\/$/,"");
-    if (method === "instapay") {
-      const fepBase=env("KASHIER_FEP_BASE_URL", apiBase.includes("test-api") ? "https://test-fep.kashier.io" : "https://fep.kashier.io").replace(/\/$/,"");
-      const amount=Number(order.total||0).toFixed(2);
-      const hashPath=`/?payment=${merchantId}.${order.orderCode}.${Number(amount)}.EGP`;
-      const hash=crypto.createHmac("sha256",apiKey).update(hashPath).digest("hex");
-      const payload={apiOperation:"GENERATE_QR",interactionSource:"ECOMMERCE",order:{reference:order.orderCode,amount:Number(amount),currency:"EGP"},paymentMethod:{type:"instapay",instapay:{validity:env("KASHIER_INSTAPAY_VALIDITY","30")}},merchantId,serverWebhook:`${appUrl}/api/kashier/webhook`};
-      const r=await fetch(`${fepBase}/v3/orders`,{method:"POST",headers:{"Content-Type":"application/json","Kashier-Hash":hash},body:JSON.stringify(payload)});
-      const data=await r.json().catch(()=>({}));
-      if(!r.ok || String(data.status||data.data?.status||"").toUpperCase()==="FAILURE") { console.error("Kashier InstaPay error",r.status,data); return res.status(502).json({ok:false,error:data.message||data.data?.message||"تعذر إنشاء طلب InstaPay. تأكد من تفعيل الخدمة لدى Kashier."}); }
-      const body=data.data||data;
-      const instapay=body.paymentMethod?.instapay||body.payment_method?.instapay||body.instapay||{};
-      const qrCode=instapay.qrCode||instapay.qrImage||instapay.qrCodeUrl||instapay.qrUrl||body.qrCode||body.qrImage||body.qrCodeUrl||body.qrUrl||null;
-      const qrPayload=instapay.qrPayload||instapay.qrString||instapay.qrData||instapay.payload||body.qrPayload||body.qrString||body.qrData||body.payload||null;
-      await ref.update({kashierMethod:method,kashierOrderReference:order.orderCode,kashierStatus:"PENDING",paymentStatus:"pending",updatedAt:admin.firestore.FieldValue.serverTimestamp()});
-      return res.json({ok:true,kind:"instapay",orderCode:order.orderCode,qrCode,qrPayload,expiresAt:instapay.expiresAt||body.expiresAt||null,message:"افتح تطبيق InstaPay وامسح رمز QR ثم انتظر تأكيد Kashier."});
-    }
-    const allowedMethods = method === "wallet" ? "wallet" : "card";
+    const appUrl=(process.env.APP_URL||`${req.protocol}://${req.get("host")}`).replace(/\/$/,"");
+    const base=env("KASHIER_API_BASE_URL","https://api.kashier.io").replace(/\/$/,"");
+    const allowedMethods=method;
     const expireAt=new Date(Date.now()+30*60*1000).toISOString();
-    const redirectUrl = new URL("/checkout.html", appUrl);
-    redirectUrl.searchParams.set("payment", "return");
-    redirectUrl.searchParams.set("order", order.orderCode);
-    const payload={expireAt,maxFailureAttempts:3,paymentType:"credit",amount:Number(order.total||0).toFixed(2),currency:"EGP",order:order.orderCode,merchantId,merchantRedirect:redirectUrl.toString(),display:"ar",type:"one-time",allowedMethods,redirectMethod:null,metaData:{orderId,orderCode:order.orderCode},failureRedirect:false,description:`AXEL Order ${order.orderCode}`,interactionSource:"ECOMMERCE",enable3DS:method!=="applepay",serverWebhook:`${appUrl}/api/kashier/webhook`,customer:{email:order.email,reference:order.orderCode}};
-    const r=await fetch(`${apiBase}/v3/payment/sessions`,{method:"POST",headers:{Authorization:secretKey,"api-key":apiKey,"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    const payload={expireAt,maxFailureAttempts:3,paymentType:"credit",amount:Number(order.total||0).toFixed(2),currency:"EGP",order:order.orderCode,merchantId,merchantRedirect:`${appUrl}/checkout.html?payment=return&order=${encodeURIComponent(order.orderCode)}`,display:"ar",type:"one-time",allowedMethods,redirectMethod:null,metaData:{orderId,orderCode:order.orderCode},failureRedirect:false,description:`AXEL Order ${order.orderCode}`,interactionSource:"ECOMMERCE",enable3DS:true,serverWebhook:`${appUrl}/api/kashier/webhook`,customer:{email:order.email,reference:order.orderCode}};
+    const r=await fetch(`${base}/v3/payment/sessions`,{method:"POST",headers:{Authorization:secretKey,"api-key":apiKey,"Content-Type":"application/json"},body:JSON.stringify(payload)});
     const data=await r.json().catch(()=>({}));
     if(!r.ok||!data.sessionUrl){console.error("Kashier session error",r.status,data);return res.status(502).json({ok:false,error:data?.message||"تعذر إنشاء جلسة الدفع من Kashier"});}
-    const sessionId=data._id||data.sessionId||data.id||null;
-    await ref.update({kashierSessionId:sessionId,kashierMethod:method,paymentStatus:"pending",updatedAt:admin.firestore.FieldValue.serverTimestamp()});
-    if(method==="applepay") return res.json({ok:true,kind:"applepay",sessionId,mode:apiBase.includes("test-api")?"test":"live",orderCode:order.orderCode});
-    res.json({ok:true,kind:"redirect",checkoutUrl:data.sessionUrl,sessionId});
+    await ref.update({kashierSessionId:data._id||data.sessionId||null,kashierMethod:method,paymentStatus:"pending",updatedAt:admin.firestore.FieldValue.serverTimestamp()});
+    res.json({ok:true,checkoutUrl:data.sessionUrl,sessionId:data._id||data.sessionId||null});
   } catch(e){console.error("Kashier checkout error",e.message);res.status(502).json({ok:false,error:"تعذر الاتصال بـ Kashier حالياً"});}
 });
 
-app.post("/api/kashier/webhook", async (req, res) => {
-  if (!firebaseReady || !db) return res.sendStatus(503);
-  try {
-    const data = req.body?.data || {};
-    const sig = String(req.get("x-kashier-signature") || "");
-    const key = env("KASHIER_API_KEY");
-    if (!key || !sig) return res.sendStatus(401);
-    const keys = Array.isArray(data.signatureKeys) ? [...data.signatureKeys].sort() : [];
-    if (!keys.length) return res.sendStatus(401);
-    const signedPayload = keys.map(k => `${k}=${encodeURIComponent(String(data[k] ?? ""))}`).join("&");
-    const expected = crypto.createHmac("sha256", key).update(signedPayload).digest("hex");
-    const a = Buffer.from(expected.toLowerCase());
-    const b = Buffer.from(sig.toLowerCase());
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.sendStatus(401);
-
-    const code = String(data.merchantOrderId || data.orderReference || data.order || "").trim();
-    if (!code) return res.sendStatus(200);
-    const found = await db.collection("orders").where("orderCode", "==", code).limit(1).get();
-    if (found.empty) return res.sendStatus(200);
-    const orderRef = found.docs[0].ref;
-    const status = String(data.status || "").toUpperCase();
-    const initialOrder = found.docs[0].data();
-    const paidAmount = Number(data.amount);
-    const expectedAmount = Number(initialOrder.total || 0);
-    if (status === "SUCCESS" && (!Number.isFinite(paidAmount) || Math.abs(paidAmount - expectedAmount) > 0.009)) {
-      console.error("Kashier webhook amount mismatch", { orderCode: code, paidAmount, expectedAmount });
-      return res.sendStatus(200);
-    }
-    if (status === "SUCCESS" && data.currency && String(data.currency).toUpperCase() !== "EGP") {
-      console.error("Kashier webhook currency mismatch", { orderCode: code, currency: data.currency });
-      return res.sendStatus(200);
-    }
-
-    let notificationOrder = null;
-    await db.runTransaction(async tx => {
-      notificationOrder = null; // Reset on Firestore transaction retries.
-      const orderSnap = await tx.get(orderRef);
-      if (!orderSnap.exists) return;
-      const order = orderSnap.data();
-      if (order.paymentStatus === "paid") return; // Idempotent: duplicate webhook must not deduct twice.
-
-      if (status !== "SUCCESS") {
-        if (["FAILURE", "REJECTED", "VOIDED", "REVERSED"].includes(status)) {
-          tx.update(orderRef, {
-            paymentStatus: "failed", status: "ملغي", inventoryStatus: "not_deducted",
-            kashierTransactionId: data.transactionId || null, kashierStatus: status,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          });
-        }
-        return;
-      }
-
-      const items = Array.isArray(order.items) ? order.items : [];
-      const demand = new Map();
-      for (const item of items) {
-        const key = `${item.productId}::${item.color}::${item.size}`;
-        demand.set(key, (demand.get(key) || 0) + Math.max(1, Number(item.quantity) || 1));
-      }
-      const productIds = [...new Set(items.map(item => String(item.productId || "")).filter(Boolean))];
-      const productRefs = productIds.map(id => db.collection("products").doc(id));
-      const productSnaps = [];
-      for (const ref of productRefs) productSnaps.push(await tx.get(ref));
-      const productById = new Map(productRefs.map((ref, i) => [ref.id, productSnaps[i]]));
-      const couponCode = String(order.couponCode || "").trim().toUpperCase();
-      const couponRef = couponCode ? db.collection("coupons").doc(couponCode) : null;
-      const couponSnap = couponRef ? await tx.get(couponRef) : null;
-
-      let stockOk = true;
-      const nextStocks = new Map();
-      for (const [key, qty] of demand) {
-        const [productId, color, size] = key.split("::");
-        const snap = productById.get(productId);
-        if (!snap?.exists) { stockOk = false; break; }
-        const product = snap.data();
-        const currentStock = nextStocks.has(productId) ? nextStocks.get(productId) : structuredClone(product.stock || {});
-        const available = Number(currentStock?.[color]?.[size] || 0);
-        if (available < qty) { stockOk = false; break; }
-        currentStock[color] = currentStock[color] || {};
-        currentStock[color][size] = available - qty;
-        nextStocks.set(productId, currentStock);
-      }
-
-      const now = admin.firestore.FieldValue.serverTimestamp();
-      const patch = {
-        paymentStatus: "paid", status: order.status === "ملغي" ? "جديد" : order.status,
-        kashierTransactionId: data.transactionId || null, kashierStatus: status,
-        inventoryDeducted: stockOk, inventoryStatus: stockOk ? "deducted" : "needs_review",
-        updatedAt: now
-      };
-      if (stockOk) {
-        for (const [productId, stock] of nextStocks) {
-          tx.update(db.collection("products").doc(productId), { stock, updatedAt: now });
-        }
-      }
-      if (couponRef && couponSnap?.exists && !order.couponUsageRecorded) {
-        tx.update(couponRef, { usedCount: admin.firestore.FieldValue.increment(1), updatedAt: now });
-        patch.couponUsageRecorded = true;
-      }
-      tx.update(orderRef, patch);
-      notificationOrder = { ...order, ...patch, id: orderRef.id };
-    });
-
-    // Telegram is sent only after a verified SUCCESS webhook, never when checkout is merely started.
-    if (notificationOrder) await notifyTelegram(notificationOrder);
+app.post("/api/kashier/webhook", async (req,res)=>{
+  try{
+    const data=req.body?.data||{}; const sig=String(req.get("x-kashier-signature")||""); const key=env("KASHIER_API_KEY");
+    if(!key||!sig)return res.sendStatus(401);
+    const keys=Array.isArray(data.signatureKeys)?[...data.signatureKeys].sort():[];
+    const payload=keys.map(k=>`${k}=${encodeURIComponent(String(data[k]??""))}`).join("&");
+    const expected=crypto.createHmac("sha256",key).update(payload).digest("hex");
+    if(expected.toLowerCase()!==sig.toLowerCase())return res.sendStatus(401);
+    const code=String(data.merchantOrderId||data.orderReference||"").trim(); if(!code)return res.sendStatus(200);
+    const snap=await db.collection("orders").where("orderCode","==",code).limit(1).get(); if(snap.empty)return res.sendStatus(200);
+    const ref=snap.docs[0].ref, order=snap.docs[0].data(), status=String(data.status||"").toUpperCase();
+    const patch={kashierTransactionId:data.transactionId||null,kashierStatus:status,updatedAt:admin.firestore.FieldValue.serverTimestamp()};
+    if(status==="SUCCESS"){patch.paymentStatus="paid";patch.status=order.status==='ملغي'?'جديد':order.status;}
+    else if(status==="FAILURE"||status==="REJECTED"||status==="VOIDED"||status==="REVERSED"){patch.paymentStatus="failed";patch.status="ملغي";}
+    await ref.update(patch);
+    if(status==="SUCCESS"||status==="FAILURE") await notifyTelegram({...order,...patch,id:ref.id});
     return res.sendStatus(200);
-  } catch (e) {
-    console.error("Kashier webhook error", e.message);
-    return res.sendStatus(500);
+  }catch(e){console.error("Kashier webhook error",e.message);return res.sendStatus(500);}
+});
+
+app.post("/api/paymob/checkout", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  if (!paymobConfigured()) return res.status(503).json({ ok: false, error: "بوابة Paymob لم تُفعّل بعد. أضف بيانات Paymob الحقيقية إلى متغيرات البيئة أولاً." });
+  const orderId = String(req.body?.orderId || "").trim();
+  if (!orderId) return res.status(400).json({ ok: false, error: "رقم الطلب غير موجود" });
+  try {
+    const ref = db.collection("orders").doc(orderId);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ ok: false, error: "الطلب غير موجود" });
+    const order = snap.data();
+    if (order.paymentMethod !== "Paymob") return res.status(400).json({ ok: false, error: "هذا الطلب ليس دفعه إلكترونية" });
+    const amount = Math.round(Number(order.total || 0) * 100);
+    const integrationId = Number(process.env.PAYMOB_INTEGRATION_ID_CARD);
+    if (!Number.isInteger(integrationId) || integrationId <= 0) return res.status(503).json({ ok: false, error: "PAYMOB_INTEGRATION_ID_CARD غير مضبوط بشكل صحيح" });
+    const customer = splitCustomerName(order.customerName);
+    const appUrl = (process.env.APP_URL || `${req.protocol}://${req.get("host")}`).replace(/\/$/, "");
+    const base = String(process.env.PAYMOB_BASE_URL).replace(/\/$/, "");
+    const payload = {
+      amount, currency: "EGP", payment_methods: [integrationId],
+      items: [
+        ...(Array.isArray(order.items)&&order.items.length?order.items.map(it=>({name:it.productName||"منتج AXEL",amount:Math.round(Number(it.unitPrice||0)*100),quantity:Number(it.quantity||1),description:`AXEL ${it.color||""} ${it.size||""}`})):[{name:order.productName||"منتج AXEL",amount:Math.round(Number(order.unitPrice||0)*100),quantity:Number(order.quantity||1),description:"AXEL T-shirt"}]),
+        { name: "الشحن", amount: Math.round(Number(order.shipping || 0) * 100), quantity: 1, description: "شحن الطلب" }
+      ],
+      billing_data: { first_name: customer.firstName, last_name: customer.lastName, email: order.email, phone_number: order.phone, apartment: "NA", floor: "NA", street: order.address, building: "NA", shipping_method: "NA", postal_code: "NA", city: "NA", state: "NA", country: "EG" },
+      customer: { first_name: customer.firstName, last_name: customer.lastName, email: order.email },
+      special_reference: order.orderCode,
+      notification_url: `${appUrl}/api/paymob/webhook`,
+      redirection_url: `${appUrl}/checkout.html?payment=return&order=${encodeURIComponent(order.orderCode)}`
+    };
+    const r = await fetch(`${base}/v1/intention/`, { method: "POST", headers: { Authorization: `Token ${process.env.PAYMOB_SECRET_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.client_secret) {
+      console.error("Paymob intention error", r.status, data);
+      return res.status(502).json({ ok: false, error: "تعذر إنشاء عملية الدفع من Paymob. راجع بيانات Paymob وحالة Integration ID." });
+    }
+    await ref.update({ paymobIntentionId: data.id || null, paymobOrderId: data.intention_order_id || data.order_id || null, paymentStatus: "pending", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    const checkoutUrl = `${base}/unifiedcheckout/?publicKey=${encodeURIComponent(process.env.PAYMOB_PUBLIC_KEY)}&clientSecret=${encodeURIComponent(data.client_secret)}`;
+    res.json({ ok: true, checkoutUrl });
+  } catch (error) {
+    console.error("Paymob checkout error", error.message);
+    res.status(502).json({ ok: false, error: "تعذر الاتصال ببوابة Paymob حالياً" });
   }
 });
 
@@ -789,8 +635,7 @@ app.get("/api/admin/orders", requireAdmin, async (req, res) => {
 
 app.patch("/api/admin/orders/:id", requireAdmin, async (req, res) => {
   const allowedStatuses = ["جديد", "قيد التجهيز", "تم الشحن", "تم التوصيل", "ملغي", "مرتجع"];
-  const allowedPayments = ["pending", "failed", "refunded"];
-  if (req.body?.paymentStatus === "paid") return res.status(400).json({ ok: false, error: "تأكيد الدفع يتم تلقائيًا من Kashier بعد التحقق من العملية." });
+  const allowedPayments = ["pending", "paid", "failed", "refunded"];
   const patch = {};
   if (allowedStatuses.includes(req.body?.status)) patch.status = req.body.status;
   if (allowedPayments.includes(req.body?.paymentStatus)) patch.paymentStatus = req.body.paymentStatus;
@@ -821,6 +666,48 @@ app.get("/api/admin/stats", requireAdmin, async (req, res) => {
   } catch { res.status(500).json({ ok: false, error: "فشل تحميل الإحصائيات" }); }
 });
 
+app.post("/api/paymob/webhook", async (req, res) => {
+  if (!paymobConfigured()) return res.status(503).json({ ok: false, error: "Paymob غير مُعد" });
+  const obj = req.body?.obj;
+  const receivedHmac = String(req.query?.hmac || "");
+  if (!verifyPaymobHmac(obj, receivedHmac)) return res.status(401).json({ ok: false, error: "Invalid Paymob HMAC" });
+   const merchantOrderId=String(obj?.order?.merchant_order_id||"").trim();
+   const paymobOrderId=String(obj?.order?.id||"").trim();
+   if(!merchantOrderId&&!paymobOrderId)return res.status(400).json({ok:false,error:"Paymob order reference missing"});
+   try {
+     let snap=merchantOrderId?await db.collection("orders").where("orderCode","==",merchantOrderId).limit(1).get():{empty:true,docs:[]};
+     if(snap.empty&&paymobOrderId){ snap=await db.collection("orders").where("paymobOrderId","==",Number(paymobOrderId)).limit(1).get(); if(snap.empty)snap=await db.collection("orders").where("paymobOrderId","==",paymobOrderId).limit(1).get(); }
+     if(snap.empty)return res.status(404).json({ok:false,error:"AXEL order not found"});
+    const orderRef = snap.docs[0].ref;
+    const current = snap.docs[0].data();
+    const success = obj.success === true && obj.pending === false;
+    const failed = obj.success === false && obj.pending === false;
+    let changed = false;
+    await db.runTransaction(async tx => {
+      const fresh = await tx.get(orderRef);
+      if (!fresh.exists) throw new Error("ORDER_NOT_FOUND");
+      const order = fresh.data();
+      const patch = { paymobTransactionId: obj.id || null, paymobOrderId: obj.order?.id || null, updatedAt: admin.firestore.FieldValue.serverTimestamp() };
+      if (success && order.paymentStatus !== "paid") { patch.paymentStatus = "paid"; patch.status = order.status === "ملغي" ? "جديد" : order.status; changed = true; }
+      else if (failed && order.paymentStatus !== "failed") {
+        patch.paymentStatus = "failed"; patch.status = "ملغي";
+        if (!order.stockRestored) {
+          if (order.couponCode) { const couponRef=db.collection("coupons").doc(String(order.couponCode).toUpperCase()); const couponSnap=await tx.get(couponRef); if(couponSnap.exists) tx.update(couponRef,{usedCount:admin.firestore.FieldValue.increment(-1),updatedAt:admin.firestore.FieldValue.serverTimestamp()}); }
+          const restoreItems=Array.isArray(order.items)&&order.items.length?order.items:[{productId:order.productId,color:order.color,size:order.size,quantity:order.quantity}];
+          for(const it of restoreItems){const productRef=db.collection("products").doc(it.productId);const productSnap=await tx.get(productRef);if(productSnap.exists){const product=productSnap.data();const stock=structuredClone(product.stock||{});stock[it.color]=stock[it.color]||{};stock[it.color][it.size]=Number(stock[it.color][it.size]||0)+Number(it.quantity||0);tx.update(productRef,{stock,updatedAt:admin.firestore.FieldValue.serverTimestamp()});}}
+          patch.stockRestored = true;
+        }
+        changed = true;
+      }
+      tx.update(orderRef, patch);
+    });
+    if (changed) await notifyTelegram({ ...current, paymentStatus: success ? "paid" : "failed", status: success ? current.status : "ملغي" });
+    res.json({ ok: true, received: true });
+  } catch (error) {
+    console.error("Paymob webhook error", error.message);
+    res.status(500).json({ ok: false, error: "تعذر تحديث حالة الطلب" });
+  }
+});
 
 app.use(express.static(__dirname, { index: "index.html", extensions: ["html"], setHeaders(res){ res.setHeader("Cache-Control", "no-cache, must-revalidate"); } }));
 app.get("*", (req, res) => {

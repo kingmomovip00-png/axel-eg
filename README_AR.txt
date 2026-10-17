@@ -31,6 +31,3 @@ ADMIN_EMAIL=axel.support.eg@gmail.com
 - إحصائيات المنتجات والطلبات والمبيعات والزوار
 - إشعار Telegram اختياري عند كل طلب
 - نقطة Webhook جاهزة لكن بوابة الدفع نفسها تحتاج بيانات حساب التاجر وتفعيل التحقق الخاص بها
-
-
-طرق الدفع عبر Kashier: Visa/Mastercard وVodafone Cash (من خلال مسار المحافظ)، Apple Pay عبر Kashier SDK بعد اعتماد نطاق الموقع، وInstaPay عبر Direct API بعد تفعيل الخدمة لدى Kashier. راجع VERCEL_SETUP_AR.txt قبل النشر.

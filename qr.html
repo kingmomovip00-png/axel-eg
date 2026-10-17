@@ -1,155 +1,38 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#1d1d1b">
-  <title>AXEL | كود خصم خاص</title>
-  <link rel="stylesheet" href="css/style.css">
-  <style>
-    .qr{width:min(460px,92%);margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 0 max(40px,env(safe-area-inset-bottom))}
-    .qr-logo{display:block;width:min(260px,70%);margin:0 auto 6px}
-    .qr h1{font-size:var(--fs-lg);text-align:center;margin:6px 0 4px}
-    .qr-lead{text-align:center;color:var(--muted);margin:0 0 22px;font-size:var(--fs-sm)}
-    .qr-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px}
-    .qr-step{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;transition:border-color .2s,background .2s}
-    .qr-step:last-of-type{margin-bottom:0}
-    .qr-step img{width:26px;height:26px;flex:none;filter:brightness(0) saturate(100%) invert(67%) sepia(29%) saturate(923%) hue-rotate(136deg)}
-    .qr-step div{flex:1;min-width:0}
-    .qr-step b{display:block;font-size:var(--fs-md)}
-    .qr-step small{color:var(--muted);font-size:var(--fs-xs);direction:ltr;display:block;text-align:right}
-    .qr-open{border:1px solid var(--blue);color:var(--blue);background:transparent;border-radius:999px;padding:6px 16px;font-size:var(--fs-sm);cursor:pointer}
-    .qr-step.done{border-color:var(--blue);background:var(--blue-soft)}
-    .qr-step.done .qr-open{background:var(--blue);color:var(--dark)}
-    .qr-bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin:14px 0 6px}
-    .qr-bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .35s}
-    .qr-count{text-align:center;color:var(--muted);font-size:var(--fs-xs)}
-    .qr-locked{text-align:center;color:var(--muted);font-size:var(--fs-sm)}
-    .qr-reveal{text-align:center}
-    .qr-code{font-size:34px;letter-spacing:.18em;direction:ltr;color:var(--blue);border:2px dashed var(--blue);border-radius:16px;padding:14px;margin:12px 0}
-    .qr-btn{display:block;width:100%;border:0;border-radius:14px;padding:14px;background:var(--blue);color:var(--dark);font-size:var(--fs-md);cursor:pointer;margin-top:10px}
-    .qr-btn.alt{background:transparent;color:var(--text);border:1px solid var(--line)}
-    .qr-err{color:var(--danger);text-align:center;font-size:var(--fs-sm)}
-  </style>
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="192x192" href="/assets/seo/favicon-192.png">
-  <link rel="apple-touch-icon" href="/assets/seo/apple-touch-icon.png">
-  <meta property="og:site_name" content="AXEL">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="AXEL | ملابس رجالي">
-  <meta property="og:image" content="https://axel-eg.com/assets/seo/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-</head>
-<body>
-<main class="qr">
-  <img class="qr-logo" src="assets/logo/logo.png" alt="AXEL">
-  <h1>أهلاً بيك في عالم AXEL</h1>
-  <p class="qr-lead">اضغط على زرار <b>اشترك</b> في كل حساب، وارجع اضغط على اللي بعده. أول ما تخلّص التلاتة اكتب رقم موبايلك وأكّده بكود SMS وهيظهر لك كوبون خصم <b>20%</b> على أول أوردر من الموقع. كل رقم له كوبون واحد، ويُستخدم مرة واحدة.</p>
-
-  <section class="qr-card">
-    <div id="steps"></div>
-    <div class="qr-bar"><i id="bar"></i></div>
-    <div class="qr-count" id="count"></div>
-  </section>
-
-  <section class="qr-card">
-    <div class="qr-locked" id="locked">🔒 اشترك في الحسابات التلاتة فوق عشان كوبون الخصم يظهر</div>
-    <div class="hidden" id="phoneBox" style="text-align:center">
-      <p style="margin:0 0 10px">خلصت الاشتراك! اكتب رقم موبايلك وهنبعتلك كود تأكيد SMS 📱</p>
-      <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" dir="ltr" placeholder="01XXXXXXXXX" maxlength="16" style="width:100%;background:var(--dark);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:13px;font-size:var(--fs-md);text-align:center">
-      <button class="qr-btn" id="sendCode" type="button">ابعتلي كود التأكيد</button>
-    </div>
-    <div class="hidden" id="otpBox" style="text-align:center">
-      <p style="margin:0 0 10px">اكتب الكود اللي وصلك على <b id="otpPhone" dir="ltr"></b></p>
-      <input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" placeholder="------" maxlength="6" style="width:100%;background:var(--dark);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:13px;font-size:var(--fs-md);text-align:center">
-      <button class="qr-btn" id="verifyCode" type="button">أكّد وهات الكوبون</button>
-      <button class="qr-btn alt" id="changePhone" type="button">غيّر الرقم</button>
-    </div>
-    <div class="qr-reveal hidden" id="reveal">
-      <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#3caeb8" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/></svg><h2 id="rTitle" style="margin:6px 0 0"></h2>
-      <p class="muted" id="rText" style="margin:4px 0 0"></p>
-      <div class="qr-code" id="rCode"></div>
-      <p class="muted" id="rExp" style="margin:0"></p><button class="qr-btn" id="copy" type="button">نسخ الكود</button>
-      <a class="qr-btn alt" id="shop" href="index.html" style="text-align:center">تسوّق دلوقتي</a>
-    </div>
-    <div class="qr-err hidden" id="err"></div>
-  </section>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d1d1b"><meta name="description" content="تابع حسابات AXEL واحصل على كوبون خصم 20% على أول أوردر.">
+<meta property="og:title" content="AXEL | كوبون خصم خاص"><meta property="og:description" content="تابع حسابات AXEL واحصل على خصم 20% على أول أوردر."><meta property="og:image" content="https://axel-eg.com/assets/logo/logo.png"><meta property="og:url" content="https://axel-eg.com/qr"><meta property="og:type" content="website">
+<title>كوبون AXEL الخاص</title>
+<link rel="icon" href="/assets/logo/logo.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+@font-face{font-family:Axel;src:url('/assets/fonts/axel-font.ttf')}*{box-sizing:border-box} :root{--bg:#1d1d1b;--primary:#3caeb8;--white:#f5f5f2;--muted:#b7c0c0}body{margin:0;background:radial-gradient(ellipse at 50% 0%,#244447 0,transparent 48%),var(--bg);color:var(--white);font-family:Axel,system-ui,sans-serif;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:22px}.wrap{width:min(100%,510px);text-align:center}.logo{width:150px;max-height:100px;object-fit:contain;margin:0 auto 12px}.tag{display:inline-block;color:var(--primary);border:1px solid #3caeb855;border-radius:30px;padding:7px 15px;font-size:13px}h1{font-size:clamp(26px,7vw,36px);line-height:1.35;margin:15px 0 8px}p{color:var(--muted);line-height:1.9;margin:8px 0 18px}.card{background:#242522;border:1px solid #ffffff17;border-radius:22px;padding:23px 18px;box-shadow:0 20px 60px #0005}.socials{display:grid;gap:10px;margin:18px 0}.social{display:flex;align-items:center;gap:12px;width:100%;border:1px solid #ffffff20;background:#2d302d;color:white;padding:13px 15px;border-radius:13px;text-decoration:none;font:inherit;text-align:right;cursor:pointer;transition:.18s}.social:hover,.social.done{border-color:var(--primary);background:#263c3b;transform:translateY(-1px)}.social img{width:27px;height:27px;object-fit:contain}.check{margin-right:auto;color:var(--primary);font-size:20px}.hint{font-size:13px;margin:8px 0 16px}.field{text-align:right;margin:13px 0}.field label{display:block;margin:0 0 7px;font-size:14px}.field input{width:100%;padding:14px 13px;border-radius:11px;border:1px solid #ffffff2a;background:#171816;color:white;font:inherit;outline:none}.field input:focus{border-color:var(--primary)}.main{width:100%;border:0;background:var(--primary);color:#102426;border-radius:12px;padding:14px;font:inherit;font-weight:bold;cursor:pointer;margin-top:9px}.main:disabled{opacity:.45;cursor:not-allowed}.notice{font-size:14px;margin:12px 0 0;color:var(--primary);min-height:24px}.coupon{border:1px dashed var(--primary);border-radius:15px;padding:18px;margin-top:16px;background:#172a29}.coupon strong{display:block;font-size:27px;letter-spacing:2px;color:var(--primary);direction:ltr}.copy{background:transparent;color:var(--primary);border:1px solid var(--primary);border-radius:9px;padding:9px 15px;font:inherit;margin-top:10px;cursor:pointer}.hidden{display:none!important}.footer{font-size:12px;color:#8e9693;margin-top:18px}.footer a{color:var(--primary);text-decoration:none}.small{font-size:12px;color:#929a96;line-height:1.7}.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:18px 0}.step{font-size:12px;color:#c3c8c5;border:1px solid #ffffff15;border-radius:10px;padding:10px 4px}.step b{display:block;color:var(--primary);font-size:18px;margin-bottom:3px}@media(min-width:600px){body{padding:32px}.card{padding:28px}}
+</style></head>
+<body><main class="wrap">
+<img class="logo" src="/assets/logo/logo.png" alt="AXEL"><div class="tag">AXEL EGYPT · SPECIAL OFFER</div>
+<h1>خد خصم 20% على أول أوردر</h1><p>تابع حسابات AXEL، أكّد رقم موبايلك، وخد كوبونك الخاص لاستخدامه مرة واحدة على موقعنا.</p>
+<section class="card">
+<div class="steps"><div class="step"><b>١</b>تابع الحسابات</div><div class="step"><b>٢</b>أكّد الموبايل</div><div class="step"><b>٣</b>استلم الكوبون</div></div>
+<div class="socials" id="socials">
+<a class="social" data-social="facebook" href="https://www.facebook.com/share/1CKzTxHWMK/" target="_blank" rel="noopener"><img src="/assets/icons/facebook.svg" alt=""><span>تابعنا على فيسبوك</span><span class="check">＋</span></a>
+<a class="social" data-social="instagram" href="https://www.instagram.com/axel.egypt?cplk=MXdxMjUzMnZha3Nxcw==" target="_blank" rel="noopener"><img src="/assets/icons/instagram.svg" alt=""><span>تابعنا على إنستجرام</span><span class="check">＋</span></a>
+<a class="social" data-social="tiktok" href="https://www.tiktok.com/@axel_egypt" target="_blank" rel="noopener"><img src="/assets/icons/tiktok.svg" alt=""><span>تابعنا على تيك توك</span><span class="check">＋</span></a>
+</div><p class="hint">افتح كل حساب واضغط على زر المتابعة، وبعدها ارجع هنا. الضغط على الأزرار وحده لا يؤكد المتابعة تلقائيًا.</p>
+<div id="phoneArea" class="hidden"><div class="field"><label for="phone">رقم الموبايل المصري</label><input id="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="01xxxxxxxxx" maxlength="15"></div><div id="recaptcha-container"></div><button id="sendCode" class="main">إرسال كود التأكيد SMS</button><div id="otpArea" class="hidden"><div class="field"><label for="otp">كود التأكيد اللي وصلك</label><input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div><button id="verifyCode" class="main">تأكيد الرقم واستلام الكوبون</button></div></div>
+<div id="couponArea" class="coupon hidden"><p style="margin:0 0 8px;color:#f5f5f2">مبروك! خصم 20% على أول أوردر</p><strong id="couponCode"></strong><button id="copyCode" class="copy">نسخ الكوبون</button><p class="small">الكوبون مرتبط برقم الموبايل ده، صالح لاستخدام واحد فقط، ولازم تستخدم نفس الرقم عند إتمام الطلب.</p><a class="main" style="display:block;text-decoration:none" href="https://axel-eg.com/">تسوق من AXEL</a></div>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+</section><div class="footer">Official AXEL page · <a href="https://axel-eg.com/">axel-eg.com</a><br>Powered by GMV MEDIA</div>
 </main>
 <script type="module">
-import {API_URL, QR_LINKS, SITE_URL} from "./js/config.js";
-import {auth} from "./js/firebase.js";
-import {RecaptchaVerifier, signInWithPhoneNumber, signOut} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-const $=s=>document.querySelector(s), KEY="axel_qr_done";
-let done=new Set(), claimed=false;
-try{done=new Set(JSON.parse(localStorage.getItem(KEY)||"[]"))}catch{}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify([...done]))}catch{}};
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-$("#steps").innerHTML=QR_LINKS.map(l=>`<div class="qr-step" data-id="${l.id}"><img src="${l.icon}" alt=""><div><b>${esc(l.name)}</b><small>${esc(l.handle)}</small></div><button class="qr-open" type="button">اشترك</button></div>`).join("");
-$("#shop").href=SITE_URL||"index.html";
-function render(){
-  QR_LINKS.forEach(l=>{const el=document.querySelector(`[data-id="${l.id}"]`),d=done.has(l.id);el.classList.toggle("done",d);el.querySelector("button").textContent=d?"تم ✓":"اشترك"});
-  const n=done.size,t=QR_LINKS.length;
-  $("#bar").style.width=(n/t*100)+"%";
-  $("#count").textContent=`${n} من ${t}`;
-  if(n===t&&!claimed){claimed=true;$("#locked").classList.add("hidden");$("#phoneBox").classList.remove("hidden");}
-}
-function show(c){
-  $("#rTitle").textContent=`خصم ${c.value}% على أول أوردر`;
-  $("#rText").textContent="كود خاص بيك، بيشتغل مرة واحدة على أي حاجة في الموقع";
-  $("#rCode").textContent=c.code;
-  $("#rExp").textContent=c.expiresAt?`صالح لحد ${new Date(c.expiresAt).toLocaleDateString("ar-EG")}`:"";
-  $("#locked").classList.add("hidden");$("#err").classList.add("hidden");$("#reveal").classList.remove("hidden");
-  $("#copy").onclick=async()=>{try{await navigator.clipboard.writeText(c.code);$("#copy").textContent="اتنسخ ✓"}catch{$("#copy").textContent=c.code}setTimeout(()=>$("#copy").textContent="نسخ الكود",1800)};
-}
-let confirmation=null,verifier=null;
-const showErr=m=>{$("#err").textContent=m;$("#err").classList.remove("hidden")};
-const normPhone=v=>{let d=v.replace(/[٠-٩]/g,x=>"٠١٢٣٤٥٦٧٨٩".indexOf(x)).replace(/\D/g,"");if(d.startsWith("0020"))d="0"+d.slice(4);else if(d.startsWith("20")&&d.length===12)d="0"+d.slice(2);return /^01[0125]\d{8}$/.test(d)?d:""};
-function resetVerifier(){try{verifier&&verifier.clear()}catch{}verifier=null}
-async function sendCode(){
-  $("#err").classList.add("hidden");
-  const p=normPhone($("#phone").value);
-  if(!p)return showErr("اكتب رقم موبايل مصري صحيح (11 رقم يبدأ بـ 01).");
-  const btn=$("#sendCode");btn.disabled=true;btn.textContent="جاري الإرسال...";
-  try{
-    auth.languageCode="ar";
-    resetVerifier();verifier=new RecaptchaVerifier(auth,"sendCode",{size:"invisible"});
-    confirmation=await signInWithPhoneNumber(auth,"+20"+p.slice(1),verifier);
-    $("#otpPhone").textContent=p;$("#phoneBox").classList.add("hidden");$("#otpBox").classList.remove("hidden");
-  }catch(e){
-    resetVerifier();
-    showErr(e.code==="auth/too-many-requests"?"محاولات كتير، جرّب بعد شوية.":e.code==="auth/invalid-phone-number"?"الرقم غير صحيح.":"تعذر إرسال الكود، حاول تاني.");
-  }
-  btn.disabled=false;btn.textContent="ابعتلي كود التأكيد";
-}
-async function verifyAndClaim(){
-  $("#err").classList.add("hidden");
-  const code=$("#otp").value.trim();
-  if(code.length<6)return showErr("اكتب الكود المكوّن من 6 أرقام.");
-  const btn=$("#verifyCode");btn.disabled=true;btn.textContent="لحظة...";
-  try{
-    const cred=await confirmation.confirm(code);
-    const idToken=await cred.user.getIdToken();
-    try{await signOut(auth)}catch{}
-    const r=await fetch(`${API_URL}/coupons/qr`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idToken})}),d=await r.json();
-    if(!r.ok||!d.ok)throw new Error(d.error||"");
-    $("#otpBox").classList.add("hidden");
-    if(!d.coupon){$("#locked").classList.remove("hidden");$("#locked").textContent=d.reason==="used"?"الرقم ده خد كوبونه قبل كده، وكل رقم له كوبون واحد بس 💙":"العرض متوقف حاليًا، تابعنا قريب 💙";return}
-    show(d.coupon);
-  }catch(e){showErr(e.code==="auth/invalid-verification-code"?"الكود غلط، راجعه وجرّب تاني.":e.code==="auth/code-expired"?"الكود انتهى، اطلب كود جديد.":(e.message||"تعذر تحميل الكوبون، حاول تاني."))}
-  btn.disabled=false;btn.textContent="أكّد وهات الكوبون";
-}
-$("#steps").addEventListener("click",e=>{
-  const row=e.target.closest(".qr-step");if(!row)return;
-  const l=QR_LINKS.find(x=>x.id===row.dataset.id);
-  window.open(l.url,"_blank","noopener");
-  done.add(l.id);save();render();
-});
-$("#sendCode").addEventListener("click",sendCode);
-$("#verifyCode").addEventListener("click",verifyAndClaim);
-$("#changePhone").addEventListener("click",()=>{$("#otpBox").classList.add("hidden");$("#phoneBox").classList.remove("hidden");$("#err").classList.add("hidden")});
-render();
-</script>
-</body>
-</html>
+import {auth} from './js/firebase.js';
+import {RecaptchaVerifier, signInWithPhoneNumber} from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
+auth.languageCode='ar';
+const $=id=>document.getElementById(id); const notice=$('notice'); const clicked=new Set(); let verifier=null, confirmation=null;
+function say(t){notice.textContent=t||''}
+document.querySelectorAll('[data-social]').forEach(a=>a.addEventListener('click',()=>{clicked.add(a.dataset.social);a.classList.add('done');a.querySelector('.check').textContent='✓';if(clicked.size===3){$('phoneArea').classList.remove('hidden');say('تمام! دلوقتي أكّد رقم موبايلك علشان نطلع كوبون واحد خاص بيك.')}}));
+function toE164(value){let d=String(value||'').replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='20'+d.slice(1);if(d.startsWith('1')&&d.length===10)d='20'+d;return d.startsWith('20')?'+'+d:null;}
+$('sendCode').addEventListener('click',async()=>{if(clicked.size!==3)return say('افتح أزرار الحسابات الثلاثة الأول.');const phone=toE164($('phone').value);if(!phone||!/^\+201[0125]\d{8}$/.test(phone))return say('اكتب رقم موبايل مصري صحيح.');$('sendCode').disabled=true;try{if(verifier){verifier.clear();verifier=null;}verifier=new RecaptchaVerifier(auth,'recaptcha-container',{size:'normal'});await verifier.render();confirmation=await signInWithPhoneNumber(auth,phone,verifier);$('otpArea').classList.remove('hidden');say('بعتنالك رسالة SMS. اكتب كود التأكيد اللي وصلك.');}catch(e){console.error(e);say('ماقدرناش نبعت الكود. اتأكد من إعدادات Phone Authentication والدومين المسموح في Firebase، وجرب تاني.');if(verifier){verifier.clear();verifier=null;}}finally{$('sendCode').disabled=false;}});
+$('verifyCode').addEventListener('click',async()=>{const code=$('otp').value.trim();if(!confirmation||!/^\d{6}$/.test(code))return say('اكتب كود التأكيد المكوّن من 6 أرقام.');$('verifyCode').disabled=true;try{const result=await confirmation.confirm(code);const idToken=await result.user.getIdToken(true);const response=await fetch('/api/qr-coupons/claim',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+idToken},body:JSON.stringify({})});const data=await response.json();if(!response.ok){if(data.code){$('couponCode').textContent=data.code;$('couponArea').classList.remove('hidden');say('رقم الهاتف ده استلم كوبونه قبل كده؛ ده نفس الكوبون السابق.');}else say(data.error||'تعذر إصدار الكوبون.');return;} $('couponCode').textContent=data.code;$('couponArea').classList.remove('hidden');$('phoneArea').classList.add('hidden');say(data.message||'تم إصدار كوبونك بنجاح.');}catch(e){console.error(e);say('كود التأكيد غير صحيح أو انتهت صلاحيته. حاول تاني.');}finally{$('verifyCode').disabled=false;}});
+$('copyCode').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('couponCode').textContent);say('تم نسخ الكوبون.');}catch{say('حدد الكوبون وانسخه يدويًا.');}});
+</script></body></html>
