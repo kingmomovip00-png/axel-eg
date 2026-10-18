@@ -395,46 +395,103 @@ app.post("/api/admin/offers", requireAdmin, async (req, res) => {
   res.status(201).json({ ok: true, id: ref.id });
 });
 
-// ---------- QR SOCIAL COUPON: one verified email, one lifetime claim ----------
+// ---------- QR SOCIAL COUPON: email OTP code, one verified email, one lifetime claim ----------
 function normalizeClaimEmail(value) { return String(value || "").trim().toLowerCase(); }
 function emailClaimHash(email) { return crypto.createHash("sha256").update(normalizeClaimEmail(email)).digest("hex"); }
-app.post("/api/qr-coupons/claim", async (req, res) => {
+const OTP_TTL_MS = 10 * 60 * 1000, OTP_RESEND_MS = 60 * 1000, OTP_MAX_ATTEMPTS = 5, OTP_MAX_SENDS_PER_HOUR = 5;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const otpHash = (email, code) => crypto.createHash("sha256").update(`${normalizeClaimEmail(email)}:${code}:${env("OTP_SECRET", env("ADMIN_EMAIL"))}`).digest("hex");
+const ipHits = new Map();
+function ipLimited(req, max = 20, windowMs = 60 * 60 * 1000) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").split(",")[0].trim() || "unknown";
+  const now = Date.now(), arr = (ipHits.get(ip) || []).filter(t => now - t < windowMs);
+  arr.push(now); ipHits.set(ip, arr);
+  if (ipHits.size > 5000) ipHits.clear();
+  return arr.length > max;
+}
+let mailer = null;
+async function getMailer() {
+  if (mailer) return mailer;
+  const { default: nodemailer } = await import("nodemailer");
+  const port = Number(env("SMTP_PORT", "465"));
+  mailer = nodemailer.createTransport({ host: env("SMTP_HOST"), port, secure: env("SMTP_SECURE", port === 465 ? "true" : "false") === "true", auth: { user: env("SMTP_USER"), pass: env("SMTP_PASS") } });
+  return mailer;
+}
+async function sendOtpEmail(to, code) {
+  const fromName = env("MAIL_FROM_NAME", "AXEL"), fromAddr = env("MAIL_FROM_ADDRESS", env("SMTP_USER"));
+  const html = `<div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;max-width:420px;margin:auto;padding:24px;text-align:center;color:#222">
+<h2 style="margin:0 0 8px">AXEL</h2><p style="margin:0 0 16px">كود التحقق الخاص بك لاستلام كوبون الخصم:</p>
+<div style="font-size:34px;letter-spacing:8px;font-weight:bold;background:#f2f2f2;border-radius:10px;padding:14px 0;direction:ltr">${code}</div>
+<p style="color:#666;font-size:13px;margin-top:16px">الكود صالح لمدة 10 دقائق. لو ماطلبتش الكود تجاهل الرسالة.</p></div>`;
+  const text = `AXEL\nكود التحقق الخاص بك: ${code}\nالكود صالح لمدة 10 دقائق. لو ماطلبتش الكود تجاهل الرسالة.`;
+  await (await getMailer()).sendMail({ from: { name: fromName, address: fromAddr }, to, subject: `${code} هو كود التحقق من AXEL`, text, html });
+}
+
+app.post("/api/qr-coupons/send-code", async (req, res) => {
   if (!requireFirebase(res)) return;
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return res.status(401).json({ ok:false, error:"سجّل دخولك وأكّد بريدك الإلكتروني أولًا" });
+  if (!env("SMTP_HOST") || !env("SMTP_USER") || !env("SMTP_PASS")) return res.status(503).json({ ok:false, error:"خدمة الإيميل غير مفعّلة حاليًا. حاول لاحقًا." });
+  const email = normalizeClaimEmail(req.body?.email);
+  if (!EMAIL_RE.test(email) || email.length > 254) return res.status(400).json({ ok:false, error:"اكتب بريد إلكتروني صحيح." });
+  if (ipLimited(req)) return res.status(429).json({ ok:false, error:"محاولات كتير. استنى شوية وجرب تاني." });
   try {
-    const decoded = await admin.auth().verifyIdToken(token, true);
-    const email = normalizeClaimEmail(decoded.email);
-    if (!email || decoded.email_verified !== true) return res.status(403).json({ok:false,error:"افتح رسالة AXEL في بريدك واضغط رابط تأكيد البريد، وبعدها ارجع واضغط تأكيد البريد واستلام الكوبون."});
-    const emailHash = emailClaimHash(email);
-    const claimRef = db.collection("qrCouponEmailClaims").doc(emailHash);
-    const existing = await claimRef.get();
-    if (existing.exists) return res.status(200).json({ok:true, code:existing.data().code, discount:20, alreadyClaimed:true, message:"البريد ده استلم كوبونه قبل كده؛ ده نفس الكوبون السابق."});
-    let code = "AXEL" + crypto.randomBytes(4).toString("hex").toUpperCase();
-    const claimEmail = email;
-    const claimData = await db.runTransaction(async tx => {
-      const claimSnap = await tx.get(claimRef);
-      if (claimSnap.exists) return {code:claimSnap.data().code, alreadyClaimed:true};
-      let couponRef = db.collection("coupons").doc(code);
-      let couponSnap = await tx.get(couponRef);
-      if (couponSnap.exists) throw new Error("CODE_COLLISION");
-      const now = admin.firestore.FieldValue.serverTimestamp();
-      tx.set(couponRef, { code, type:"percent", value:20, minOrder:0, minQuantity:1, maxDiscount:0, usageLimit:1, usedCount:0, showOnHome:false, productIds:[], promoTitle:"خصم 20% من AXEL", promoText:"خصم 20% على أول أوردر", active:true, emailCoupon:true, emailHash, claimedEmail:claimEmail, createdAt:now, updatedAt:now });
-      tx.create(claimRef, { code, emailHash, email:claimEmail, uid:decoded.uid, createdAt:now });
-      return {code, alreadyClaimed:false};
-    });
-    if (!claimData.alreadyClaimed) {
-      const msg = ["🎟️ كوبون QR جديد - AXEL", "الاسم: " + String(decoded.name || "غير مذكور"), "البريد المؤكد: " + claimEmail, "الكوبون: " + claimData.code, "الخصم: 20% على أول أوردر", "UID: " + String(decoded.uid || "")].join("\n");
-      await notifyTelegram({ type:"qr_coupon", text:msg, customerName:decoded.name || "غير مذكور", email:claimEmail, couponCode:claimData.code });
-    }
-    return res.status(201).json({ok:true, code:claimData.code, discount:20, alreadyClaimed:claimData.alreadyClaimed, message:claimData.alreadyClaimed ? "البريد ده استلم كوبونه قبل كده؛ ده نفس الكوبون السابق." : "مبروك! تم تأكيد بريدك وإصدار كوبونك."});
+    const ref = db.collection("qrCouponOtps").doc(emailClaimHash(email)), now = Date.now();
+    const snap = await ref.get(), old = snap.exists ? snap.data() : {};
+    if (old.lastSentAt && now - old.lastSentAt < OTP_RESEND_MS) return res.status(429).json({ ok:false, error:"استنى دقيقة قبل ما تطلب كود جديد.", retryAfter: Math.ceil((OTP_RESEND_MS - (now - old.lastSentAt)) / 1000) });
+    const windowStart = old.windowStart && now - old.windowStart < 3600000 ? old.windowStart : now;
+    const sends = windowStart === old.windowStart ? Number(old.sendCount || 0) : 0;
+    if (sends >= OTP_MAX_SENDS_PER_HOUR) return res.status(429).json({ ok:false, error:"وصلت للحد الأقصى من الأكواد. جرّب بعد ساعة." });
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+    await ref.set({ codeHash: otpHash(email, code), expiresAt: now + OTP_TTL_MS, attempts: 0, lastSentAt: now, windowStart, sendCount: sends + 1, name: String(req.body?.name || "").trim().slice(0, 80) });
+    await sendOtpEmail(email, code);
+    return res.json({ ok:true, message:"بعتنالك كود من 6 أرقام على بريدك.", resendAfter: OTP_RESEND_MS / 1000 });
   } catch (error) {
-    if (error.message === "CODE_COLLISION") return res.status(503).json({ok:false,error:"حصل تعارض نادر في الكود. اضغط مرة أخرى لإعادة المحاولة."});
-    console.error("QR email coupon claim failed:", error.message);
-    return res.status(500).json({ok:false,error:"حصلت مشكلة وإحنا بنجهز الكوبون. جرّب تاني بعد شوية."});
+    console.error("QR send-code failed:", error.message);
+    return res.status(500).json({ ok:false, error:"تعذر إرسال الكود. جرّب تاني بعد شوية." });
   }
 });
+
+app.post("/api/qr-coupons/verify-code", async (req, res) => {
+  if (!requireFirebase(res)) return;
+  const email = normalizeClaimEmail(req.body?.email), code = String(req.body?.code || "").trim();
+  if (!EMAIL_RE.test(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ ok:false, error:"اكتب الكود المكوّن من 6 أرقام." });
+  if (ipLimited(req, 60)) return res.status(429).json({ ok:false, error:"محاولات كتير. استنى شوية وجرب تاني." });
+  try {
+    const emailHash = emailClaimHash(email), otpRef = db.collection("qrCouponOtps").doc(emailHash);
+    const snap = await otpRef.get();
+    if (!snap.exists) return res.status(400).json({ ok:false, error:"اطلب كود جديد الأول." });
+    const o = snap.data(), now = Date.now();
+    if (now > Number(o.expiresAt || 0)) return res.status(400).json({ ok:false, error:"الكود انتهت صلاحيته. اطلب كود جديد." });
+    if (Number(o.attempts || 0) >= OTP_MAX_ATTEMPTS) return res.status(429).json({ ok:false, error:"محاولات خاطئة كتير. اطلب كود جديد." });
+    const given = Buffer.from(otpHash(email, code)), real = Buffer.from(String(o.codeHash || ""));
+    if (given.length !== real.length || !crypto.timingSafeEqual(given, real)) {
+      await otpRef.update({ attempts: admin.firestore.FieldValue.increment(1) });
+      return res.status(400).json({ ok:false, error:"الكود غير صحيح." });
+    }
+    await otpRef.delete();
+    const claimRef = db.collection("qrCouponEmailClaims").doc(emailHash), claimEmail = email;
+    let code2 = "AXEL" + crypto.randomBytes(4).toString("hex").toUpperCase();
+    const claimData = await db.runTransaction(async tx => {
+      const claimSnap = await tx.get(claimRef);
+      if (claimSnap.exists) return { code: claimSnap.data().code, alreadyClaimed: true };
+      const couponRef = db.collection("coupons").doc(code2), couponSnap = await tx.get(couponRef);
+      if (couponSnap.exists) throw new Error("CODE_COLLISION");
+      const ts = admin.firestore.FieldValue.serverTimestamp();
+      tx.set(couponRef, { code: code2, type:"percent", value:20, minOrder:0, minQuantity:1, maxDiscount:0, usageLimit:1, usedCount:0, showOnHome:false, productIds:[], promoTitle:"خصم 20% من AXEL", promoText:"خصم 20% على أول أوردر", active:true, emailCoupon:true, emailHash, claimedEmail:claimEmail, createdAt:ts, updatedAt:ts });
+      tx.create(claimRef, { code: code2, emailHash, email:claimEmail, uid:"otp", name:o.name || "", createdAt:ts });
+      return { code: code2, alreadyClaimed: false };
+    });
+    if (!claimData.alreadyClaimed) {
+      const msg = ["🎟️ كوبون QR جديد - AXEL", "الاسم: " + (o.name || "غير مذكور"), "البريد المؤكد: " + claimEmail, "الكوبون: " + claimData.code, "الخصم: 20% على أول أوردر"].join("\n");
+      await notifyTelegram({ type:"qr_coupon", text:msg, customerName:o.name || "غير مذكور", email:claimEmail, couponCode:claimData.code });
+    }
+    return res.status(201).json({ ok:true, code:claimData.code, discount:20, alreadyClaimed:claimData.alreadyClaimed, message:claimData.alreadyClaimed ? "البريد ده استلم كوبونه قبل كده؛ ده نفس الكوبون السابق." : "مبروك! تم تأكيد بريدك وإصدار كوبونك." });
+  } catch (error) {
+    if (error.message === "CODE_COLLISION") return res.status(503).json({ ok:false, error:"حصل تعارض نادر في الكود. اضغط مرة أخرى لإعادة المحاولة." });
+    console.error("QR verify-code failed:", error.message);
+    return res.status(500).json({ ok:false, error:"حصلت مشكلة وإحنا بنجهز الكوبون. جرّب تاني بعد شوية." });
+  }
+});
+
 
 // ---------- COUPONS ----------
 app.get("/api/coupons/validate", async (req, res) => {
