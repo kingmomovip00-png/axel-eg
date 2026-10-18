@@ -135,6 +135,11 @@ function splitCustomerName(name) {
 async function notifyTelegram(order) {
   const token = process.env.TELEGRAM_BOT_TOKEN, chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
+  if (order.type === "qr_coupon" && order.text) {
+    try { await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({chat_id:chatId,text:order.text})}); }
+    catch(error) { console.error("Telegram QR coupon notification failed:", error.message); }
+    return;
+  }
   const items = Array.isArray(order.items) && order.items.length ? order.items : [{productName:order.productName,color:order.color,size:order.size,quantity:order.quantity}];
   const itemText = items.map((it,i)=>`${i+1}) ${it.productName||"منتج AXEL"} — ${it.color||""} — ${it.size||""} × ${Number(it.quantity||1)}`).join("\n");
   const text = ["🛍️ طلب جديد - AXEL",`رقم الطلب: ${order.orderCode}`,`العميل: ${order.customerName}`,`الهاتف: ${order.phone}`,`المنتجات:\n${itemText}`,`الإجمالي: ${order.total} جنيه`,`الخصم: ${order.discount||0} جنيه`,order.couponCode?`الكوبون: ${order.couponCode}`:"",`طريقة الدفع: ${order.paymentMethod}`,`حالة الدفع: ${order.paymentStatus}`,`العنوان: ${order.address}`].filter(Boolean).join("\n");
@@ -390,49 +395,44 @@ app.post("/api/admin/offers", requireAdmin, async (req, res) => {
   res.status(201).json({ ok: true, id: ref.id });
 });
 
-// ---------- QR SOCIAL COUPON: one verified phone number, one lifetime claim ----------
-function normalizePhoneForClaim(value) {
-  let digits = String(value || "").replace(/\D/g, "");
-  if (digits.startsWith("00")) digits = digits.slice(2);
-  if (digits.startsWith("0") && digits.length === 11) digits = "20" + digits.slice(1);
-  if (digits.length === 10 && digits.startsWith("1")) digits = "20" + digits;
-  return digits;
-}
-function phoneClaimHash(phone) {
-  return crypto.createHash("sha256").update(normalizePhoneForClaim(phone)).digest("hex");
-}
+// ---------- QR SOCIAL COUPON: one verified email, one lifetime claim ----------
+function normalizeClaimEmail(value) { return String(value || "").trim().toLowerCase(); }
+function emailClaimHash(email) { return crypto.createHash("sha256").update(normalizeClaimEmail(email)).digest("hex"); }
 app.post("/api/qr-coupons/claim", async (req, res) => {
   if (!requireFirebase(res)) return;
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return res.status(401).json({ ok:false, error:"أكد رقم هاتفك أولًا" });
+  if (!token) return res.status(401).json({ ok:false, error:"سجّل دخولك وأكّد بريدك الإلكتروني أولًا" });
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    const phone = String(decoded.phone_number || "");
-    const normalized = normalizePhoneForClaim(phone);
-    if (!phone || normalized.length < 10) return res.status(403).json({ok:false,error:"لازم تأكد رقم هاتفك برسالة SMS أولًا"});
-    const phoneHash = phoneClaimHash(phone);
-    const claimRef = db.collection("qrCouponClaims").doc(phoneHash);
-    const code = "AXEL" + crypto.randomBytes(4).toString("hex").toUpperCase();
-    const couponRef = db.collection("coupons").doc(code);
+    const decoded = await admin.auth().verifyIdToken(token, true);
+    const email = normalizeClaimEmail(decoded.email);
+    if (!email || decoded.email_verified !== true) return res.status(403).json({ok:false,error:"افتح رسالة AXEL في بريدك واضغط رابط تأكيد البريد، وبعدها ارجع واضغط تأكيد البريد واستلام الكوبون."});
+    const emailHash = emailClaimHash(email);
+    const claimRef = db.collection("qrCouponEmailClaims").doc(emailHash);
     const existing = await claimRef.get();
-    if (existing.exists) return res.status(409).json({ok:false,error:"رقم الهاتف ده حصل بالفعل على كوبون AXEL",code:existing.data().code});
-    await db.runTransaction(async tx => {
+    if (existing.exists) return res.status(200).json({ok:true, code:existing.data().code, discount:20, alreadyClaimed:true, message:"البريد ده استلم كوبونه قبل كده؛ ده نفس الكوبون السابق."});
+    let code = "AXEL" + crypto.randomBytes(4).toString("hex").toUpperCase();
+    const claimEmail = email;
+    const claimData = await db.runTransaction(async tx => {
       const claimSnap = await tx.get(claimRef);
-      const couponSnap = await tx.get(couponRef);
-      if (claimSnap.exists) throw new Error("PHONE_ALREADY_CLAIMED");
+      if (claimSnap.exists) return {code:claimSnap.data().code, alreadyClaimed:true};
+      let couponRef = db.collection("coupons").doc(code);
+      let couponSnap = await tx.get(couponRef);
       if (couponSnap.exists) throw new Error("CODE_COLLISION");
       const now = admin.firestore.FieldValue.serverTimestamp();
-      tx.set(couponRef, { code, type:"percent", value:20, minOrder:0, minQuantity:1, maxDiscount:0, usageLimit:1, usedCount:0, showOnHome:false, productIds:[], promoTitle:"خصم 20% من AXEL", promoText:"خصم 20% على أول أوردر", active:true, phoneCoupon:true, phoneHash, claimedPhoneLast4:normalized.slice(-4), createdAt:now, updatedAt:now });
-      tx.create(claimRef, { code, phoneHash, createdAt:now, uid:decoded.uid });
+      tx.set(couponRef, { code, type:"percent", value:20, minOrder:0, minQuantity:1, maxDiscount:0, usageLimit:1, usedCount:0, showOnHome:false, productIds:[], promoTitle:"خصم 20% من AXEL", promoText:"خصم 20% على أول أوردر", active:true, emailCoupon:true, emailHash, claimedEmail:claimEmail, createdAt:now, updatedAt:now });
+      tx.create(claimRef, { code, emailHash, email:claimEmail, uid:decoded.uid, createdAt:now });
+      return {code, alreadyClaimed:false};
     });
-    return res.status(201).json({ok:true, code, discount:20, message:"مبروك! ده كوبونك الخاص"});
-  } catch (error) {
-    if (error.message === "PHONE_ALREADY_CLAIMED") {
-      try { const decoded = await admin.auth().verifyIdToken(token); const ref = db.collection("qrCouponClaims").doc(phoneClaimHash(decoded.phone_number)); const snap = await ref.get(); return res.status(409).json({ok:false,error:"رقم الهاتف ده حصل بالفعل على كوبون AXEL",code:snap.data()?.code||null}); } catch {}
+    if (!claimData.alreadyClaimed) {
+      const msg = ["🎟️ كوبون QR جديد - AXEL", "الاسم: " + String(decoded.name || "غير مذكور"), "البريد المؤكد: " + claimEmail, "الكوبون: " + claimData.code, "الخصم: 20% على أول أوردر", "UID: " + String(decoded.uid || "")].join("\n");
+      await notifyTelegram({ type:"qr_coupon", text:msg, customerName:decoded.name || "غير مذكور", email:claimEmail, couponCode:claimData.code });
     }
-    console.error("QR coupon claim failed:", error.message);
-    return res.status(500).json({ok:false,error:"حصلت مشكلة وإحنا بنجهز الكوبون. جرّب تاني بعد شوية"});
+    return res.status(201).json({ok:true, code:claimData.code, discount:20, alreadyClaimed:claimData.alreadyClaimed, message:claimData.alreadyClaimed ? "البريد ده استلم كوبونه قبل كده؛ ده نفس الكوبون السابق." : "مبروك! تم تأكيد بريدك وإصدار كوبونك."});
+  } catch (error) {
+    if (error.message === "CODE_COLLISION") return res.status(503).json({ok:false,error:"حصل تعارض نادر في الكود. اضغط مرة أخرى لإعادة المحاولة."});
+    console.error("QR email coupon claim failed:", error.message);
+    return res.status(500).json({ok:false,error:"حصلت مشكلة وإحنا بنجهز الكوبون. جرّب تاني بعد شوية."});
   }
 });
 
@@ -506,13 +506,13 @@ app.post("/api/orders", async (req, res) => {
         subtotal+=unitPrice*it.quantity; prepared.push({productId:it.productId,productName:p.name||"منتج AXEL",imageUrl:p.images?.find(x=>x.color===it.color)?.url||p.images?.[0]?.url||"",color:it.color,size:it.size,quantity:it.quantity,unitPrice,offerApplied,bannerId:it.bannerId});
       }
       const shipping=Number(process.env.SHIPPING_PRICE||50); let discount=0,appliedCoupon="";
-      if(couponCode){const code=String(couponCode).trim().toUpperCase(),cs=await tx.get(db.collection("coupons").doc(code));if(!cs.exists)throw new Error("COUPON_INVALID");const c=cs.data(),now=Date.now(),totalQty=prepared.reduce((a,x)=>a+x.quantity,0);if(c.active===false||(c.expiresAt&&new Date(c.expiresAt.toDate?c.expiresAt.toDate():c.expiresAt).getTime()<now)||(Number(c.usageLimit||0)>0&&Number(c.usedCount||0)>=Number(c.usageLimit)))throw new Error("COUPON_INVALID");if(c.phoneCoupon&&(!c.phoneHash||phoneClaimHash(phone)!==c.phoneHash))throw new Error("COUPON_PHONE_MISMATCH");if(subtotal<Number(c.minOrder||0))throw new Error("COUPON_MIN_ORDER");if(totalQty<Number(c.minQuantity||1))throw new Error("COUPON_MIN_QTY"); if(Array.isArray(c.productIds)&&c.productIds.length&&!prepared.some(x=>c.productIds.includes(x.productId)))throw new Error("COUPON_PRODUCT"); discount=c.type==='fixed'?Math.min(subtotal,Number(c.value||0)):subtotal*Math.min(100,Number(c.value||0))/100;if(Number(c.maxDiscount||0)>0)discount=Math.min(discount,Number(c.maxDiscount));discount=Math.max(0,Math.round(discount*100)/100);appliedCoupon=code;tx.update(cs.ref,{usedCount:admin.firestore.FieldValue.increment(1),updatedAt:admin.firestore.FieldValue.serverTimestamp()});}
+      if(couponCode){const code=String(couponCode).trim().toUpperCase(),cs=await tx.get(db.collection("coupons").doc(code));if(!cs.exists)throw new Error("COUPON_INVALID");const c=cs.data(),now=Date.now(),totalQty=prepared.reduce((a,x)=>a+x.quantity,0);if(c.active===false||(c.expiresAt&&new Date(c.expiresAt.toDate?c.expiresAt.toDate():c.expiresAt).getTime()<now)||(Number(c.usageLimit||0)>0&&Number(c.usedCount||0)>=Number(c.usageLimit)))throw new Error("COUPON_INVALID");if(c.phoneCoupon&&(!c.phoneHash||phoneClaimHash(phone)!==c.phoneHash))throw new Error("COUPON_PHONE_MISMATCH");if(c.emailCoupon&&(!c.emailHash||emailClaimHash(email)!==c.emailHash))throw new Error("COUPON_EMAIL_MISMATCH");if(subtotal<Number(c.minOrder||0))throw new Error("COUPON_MIN_ORDER");if(totalQty<Number(c.minQuantity||1))throw new Error("COUPON_MIN_QTY"); if(Array.isArray(c.productIds)&&c.productIds.length&&!prepared.some(x=>c.productIds.includes(x.productId)))throw new Error("COUPON_PRODUCT"); discount=c.type==='fixed'?Math.min(subtotal,Number(c.value||0)):subtotal*Math.min(100,Number(c.value||0))/100;if(Number(c.maxDiscount||0)>0)discount=Math.min(discount,Number(c.maxDiscount));discount=Math.max(0,Math.round(discount*100)/100);appliedCoupon=code;tx.update(cs.ref,{usedCount:admin.firestore.FieldValue.increment(1),updatedAt:admin.firestore.FieldValue.serverTimestamp()});}
       const total=Math.max(0,subtotal-discount+shipping); const first=prepared[0];
       orderData={orderCode,items:prepared,productId:first.productId,productName:first.productName,imageUrl:first.imageUrl,color:first.color,size:first.size,quantity:first.quantity,unitPrice:first.unitPrice,offerApplied:first.offerApplied,bannerId:first.bannerId,couponCode:appliedCoupon,discount,customerName:String(customerName).trim(),phone:String(phone).trim(),email:String(email).trim().toLowerCase(),address:String(address).trim(),paymentMethod,paymentStatus:"pending",status:"جديد",subtotal,shipping,total,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()};
       const ref=db.collection("orders").doc();tx.set(ref,orderData);return ref;
     });
     await notifyTelegram({...orderData,id:orderRef.id});res.status(201).json({ok:true,orderId:orderRef.id,orderCode,total:orderData.total,paymentStatus:orderData.paymentStatus});
-  }catch(error){const map={PRODUCT_NOT_FOUND:"المنتج غير موجود",PRODUCT_INACTIVE:"هناك منتج غير متاح حالياً",OUT_OF_STOCK:"إحدى الكميات المطلوبة غير متاحة",INVALID_BANNER_OFFER:"العرض المرتبط بالبانر غير صالح",COUPON_INVALID:"كود الخصم غير صالح أو منتهي أو استنفد عدد استخداماته",COUPON_MIN_ORDER:"الحد الأدنى للطلب لاستخدام الكود لم يتحقق",COUPON_MIN_QTY:"يجب شراء عدد القطع المطلوب للكوبون",COUPON_PRODUCT:"كود الخصم غير متاح للمنتجات المختارة",COUPON_PHONE_MISMATCH:"الكوبون ده مرتبط برقم الهاتف اللي استلمه؛ اكتب نفس الرقم في الطلب"};res.status(400).json({ok:false,error:map[error.message]||"فشل إنشاء الطلب"});}
+  }catch(error){const map={PRODUCT_NOT_FOUND:"المنتج غير موجود",PRODUCT_INACTIVE:"هناك منتج غير متاح حالياً",OUT_OF_STOCK:"إحدى الكميات المطلوبة غير متاحة",INVALID_BANNER_OFFER:"العرض المرتبط بالبانر غير صالح",COUPON_INVALID:"كود الخصم غير صالح أو منتهي أو استنفد عدد استخداماته",COUPON_MIN_ORDER:"الحد الأدنى للطلب لاستخدام الكود لم يتحقق",COUPON_MIN_QTY:"يجب شراء عدد القطع المطلوب للكوبون",COUPON_PRODUCT:"كود الخصم غير متاح للمنتجات المختارة",COUPON_PHONE_MISMATCH:"الكوبون ده مرتبط برقم الهاتف اللي استلمه؛ اكتب نفس الرقم في الطلب",COUPON_EMAIL_MISMATCH:"الكوبون ده مرتبط بالبريد الإلكتروني اللي استلمه؛ اكتب نفس البريد في الطلب"};res.status(400).json({ok:false,error:map[error.message]||"فشل إنشاء الطلب"});}
 });
 
 app.post("/api/kashier/checkout", async (req, res) => {
@@ -625,6 +625,14 @@ app.get("/api/orders/track", async (req, res) => {
   } catch {
     res.status(500).json({ ok: false, error: "تعذر تتبع الطلب الآن" });
   }
+});
+
+app.get("/api/admin/qr-coupons", requireAdmin, async (req, res) => {
+  try {
+    const snap = await db.collection("qrCouponEmailClaims").get();
+    const claims = snap.docs.map(d => { const x=d.data(); return {id:d.id, email:x.email || "", code:x.code || "", uid:x.uid || "", createdAt:stamp(x.createdAt)}; }).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+    res.json({ok:true, claims});
+  } catch(error) { console.error("QR admin list failed:",error.message); res.status(500).json({ok:false,error:"تعذر تحميل تسجيلات كوبونات QR"}); }
 });
 
 app.get("/api/admin/orders", requireAdmin, async (req, res) => {
