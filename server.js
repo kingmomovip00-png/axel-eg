@@ -585,7 +585,8 @@ app.post("/api/orders", async (req, res) => {
       orderData={orderCode,items:prepared,productId:first.productId,productName:first.productName,imageUrl:first.imageUrl,color:first.color,size:first.size,quantity:first.quantity,unitPrice:first.unitPrice,offerApplied:first.offerApplied,bannerId:first.bannerId,couponCode:appliedCoupon,discount,customerName:String(customerName).trim(),phone:String(phone).trim(),email:String(email).trim().toLowerCase(),address:String(address).trim(),paymentMethod,paymentStatus:"pending",status:"جديد",subtotal,shipping,total,createdAt:admin.firestore.FieldValue.serverTimestamp(),updatedAt:admin.firestore.FieldValue.serverTimestamp()};
       const ref=db.collection("orders").doc();tx.set(ref,orderData);return ref;
     });
-    await notifyTelegram({...orderData,id:orderRef.id});res.status(201).json({ok:true,orderId:orderRef.id,orderCode,total:orderData.total,paymentStatus:orderData.paymentStatus});
+    // Do not notify Telegram when an order is merely created. Payment notifications are sent only after a verified successful-payment webhook.
+    res.status(201).json({ok:true,orderId:orderRef.id,orderCode,total:orderData.total,paymentStatus:orderData.paymentStatus});
   }catch(error){const map={PRODUCT_NOT_FOUND:"المنتج غير موجود",PRODUCT_INACTIVE:"هناك منتج غير متاح حالياً",OUT_OF_STOCK:"إحدى الكميات المطلوبة غير متاحة",INVALID_BANNER_OFFER:"العرض المرتبط بالبانر غير صالح",COUPON_INVALID:"كود الخصم غير صالح أو منتهي أو استنفد عدد استخداماته",COUPON_MIN_ORDER:"الحد الأدنى للطلب لاستخدام الكود لم يتحقق",COUPON_MIN_QTY:"يجب شراء عدد القطع المطلوب للكوبون",COUPON_PRODUCT:"كود الخصم غير متاح للمنتجات المختارة",COUPON_PHONE_MISMATCH:"الكوبون ده مرتبط برقم الهاتف اللي استلمه؛ اكتب نفس الرقم في الطلب",COUPON_EMAIL_MISMATCH:"الكوبون ده مرتبط بالبريد الإلكتروني اللي استلمه؛ اكتب نفس البريد في الطلب"};res.status(400).json({ok:false,error:map[error.message]||"فشل إنشاء الطلب"});}
 });
 
@@ -623,10 +624,12 @@ app.post("/api/kashier/webhook", async (req,res)=>{
     const snap=await db.collection("orders").where("orderCode","==",code).limit(1).get(); if(snap.empty)return res.sendStatus(200);
     const ref=snap.docs[0].ref, order=snap.docs[0].data(), status=String(data.status||"").toUpperCase();
     const patch={kashierTransactionId:data.transactionId||null,kashierStatus:status,updatedAt:admin.firestore.FieldValue.serverTimestamp()};
-    if(status==="SUCCESS"){patch.paymentStatus="paid";patch.status=order.status==='ملغي'?'جديد':order.status;}
-    else if(status==="FAILURE"||status==="REJECTED"||status==="VOIDED"||status==="REVERSED"){patch.paymentStatus="failed";patch.status="ملغي";}
+    let shouldNotifyPaid = false;
+    if(status==="SUCCESS" && order.paymentStatus !== "paid"){patch.paymentStatus="paid";patch.status=order.status==='ملغي'?'جديد':order.status;shouldNotifyPaid=true;}
+    else if((status==="FAILURE"||status==="REJECTED"||status==="VOIDED"||status==="REVERSED") && order.paymentStatus !== "paid"){patch.paymentStatus="failed";patch.status="ملغي";}
     await ref.update(patch);
-    if(status==="SUCCESS"||status==="FAILURE") await notifyTelegram({...order,...patch,id:ref.id});
+    // Notify only once, and only after Kashier confirms SUCCESS. Never notify for pending/failed payments.
+    if(shouldNotifyPaid) await notifyTelegram({...order,...patch,paymentStatus:"paid",id:ref.id});
     return res.sendStatus(200);
   }catch(e){console.error("Kashier webhook error",e.message);return res.sendStatus(500);}
 });
@@ -783,7 +786,8 @@ app.post("/api/paymob/webhook", async (req, res) => {
       }
       tx.update(orderRef, patch);
     });
-    if (changed) await notifyTelegram({ ...current, paymentStatus: success ? "paid" : "failed", status: success ? current.status : "ملغي" });
+    // Telegram is for confirmed paid orders only; failed/pending attempts must not trigger a new-order message.
+    if (changed && success) await notifyTelegram({ ...current, paymentStatus: "paid", status: current.status });
     res.json({ ok: true, received: true });
   } catch (error) {
     console.error("Paymob webhook error", error.message);
