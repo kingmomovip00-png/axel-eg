@@ -217,10 +217,27 @@ app.get("/api/kashier/payment-methods", async (req, res) => {
     const r = await fetch(`${base}/v2/merchants/${encodeURIComponent(merchantId)}/paymentMethods`, { headers: { Authorization: secretKey, "api-key": apiKey, Accept: "application/json" } });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) return res.status(502).json({ ok: false, error: data?.message || "تعذر قراءة طرق الدفع من Kashier" });
+    // Kashier may return payment methods in different response shapes depending on
+    // merchant/API version. Normalize common shapes before rendering checkout.
+    const source = data?.data && typeof data.data === "object" ? data.data : data;
+    const has = (...keys) => keys.some((key) => {
+      const value = source?.[key] ?? data?.[key];
+      return value === true || value === 1 || (typeof value === "string" && /^(true|enabled|active|1)$/i.test(value)) || (value && typeof value === "object" && value.enabled !== false && value.active !== false);
+    });
     const methods = [];
-    if (data.card) methods.push({ id: "card", title: "بطاقات بنكية", subtitle: "Visa / Mastercard / Meeza", icon: "assets/icons/visa.svg" });
-    if (data.wallet) methods.push({ id: "wallet", title: "المحافظ الإلكترونية", subtitle: "الدفع بالمحفظة عبر Kashier", icon: "assets/icons/vodafone-cash.svg" });
-    if (data.bank_installments) methods.push({ id: "bank_installments", title: "تقسيط بنكي", subtitle: "البنوك المتاحة في حساب Kashier", icon: "assets/icons/visa.svg" });
+    if (has("card", "cards", "credit", "credit_card", "creditCard", "debit", "bank_card")) methods.push({ id: "card", title: "بطاقات بنكية", subtitle: "Visa / Mastercard / Meeza", icon: "assets/icons/visa.svg" });
+    if (has("wallet", "wallets", "mobile_wallet", "mobileWallet", "ewallet", "e_wallet")) methods.push({ id: "wallet", title: "المحافظ الإلكترونية", subtitle: "الدفع بالمحفظة عبر Kashier", icon: "assets/icons/vodafone-cash.svg" });
+    if (has("bank_installments", "installments", "bankInstallments")) methods.push({ id: "bank_installments", title: "تقسيط بنكي", subtitle: "البنوك المتاحة في حساب Kashier", icon: "assets/icons/visa.svg" });
+    // If the merchant credentials are present but this endpoint's response schema
+    // is unfamiliar/empty, don't falsely tell customers that the merchant has no
+    // enabled methods. Offer the standard Kashier card and wallet choices; Kashier
+    // remains the authority when a checkout session is created.
+    if (!methods.length) {
+      methods.push(
+        { id: "card", title: "بطاقات بنكية", subtitle: "Visa / Mastercard / Meeza", icon: "assets/icons/visa.svg" },
+        { id: "wallet", title: "المحافظ الإلكترونية", subtitle: "الدفع بالمحفظة عبر Kashier", icon: "assets/icons/vodafone-cash.svg" }
+      );
+    }
     res.json({ ok: true, configured: true, methods });
   } catch { res.status(502).json({ ok: false, error: "تعذر الاتصال بـ Kashier" }); }
 });
