@@ -55,7 +55,7 @@ function renderBanner(target, banner, index) {
   if (!target) return;
   const mediaUrl = banner?.mediaUrl || banner?.videoUrl || banner?.imageUrl || "";
   if (!mediaUrl) {
-    target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/logo.png" class="hero-logo" alt="AXEL"><p>أحدث فيديوهات AXEL</p></div>`;
+    target.innerHTML = `<div class="hero-placeholder"><img src="assets/logo/axel-symbol.png" class="hero-logo" alt="AXEL"><p>أحدث فيديوهات AXEL</p></div>`;
     return;
   }
   target.classList.remove("banner-enter"); void target.offsetWidth; target.classList.add("banner-enter");
