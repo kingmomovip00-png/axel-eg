@@ -308,8 +308,39 @@ app.delete("/api/upload/:fileId", requireAdmin, async (req, res) => {
 
 // ---------- ADMIN PRODUCTS / BANNERS / OFFERS ----------
 app.get("/api/admin/products", requireAdmin, async (req, res) => {
-  const snap = await db.collection("products").get();
-  res.json({ ok: true, products: snap.docs.map(serializeDoc) });
+  const [snap, migration] = await Promise.all([
+    db.collection("products").get(),
+    db.collection("settings").doc("summerArchiveMigration").get()
+  ]);
+  res.json({ ok: true, products: snap.docs.map(serializeDoc), summerArchiveMigrated: migration.exists });
+});
+
+app.post("/api/admin/products/archive-summer", requireAdmin, async (req, res) => {
+  try {
+    const migrationRef = db.collection("settings").doc("summerArchiveMigration");
+    const migration = await migrationRef.get();
+    if (migration.exists) return res.status(409).json({ ok: false, error: "تم نقل المنتجات إلى أرشيف الصيف من قبل. المنتجات الجديدة لن تُنقل تلقائياً." });
+    const snap = await db.collection("products").get();
+    const products = snap.docs;
+    let moved = 0;
+    for (let i = 0; i < products.length; i += 450) {
+      const batch = db.batch();
+      products.slice(i, i + 450).forEach(doc => {
+        batch.update(doc.ref, { category: "أرشيف الصيف", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        moved++;
+      });
+      await batch.commit();
+    }
+    await migrationRef.set({
+      completed: true,
+      movedCount: moved,
+      completedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ ok: true, moved });
+  } catch (error) {
+    console.error("Summer archive migration failed:", error);
+    res.status(500).json({ ok: false, error: "تعذر نقل المنتجات إلى أرشيف الصيف. لم يتم حذف أي منتج." });
+  }
 });
 
 app.post("/api/admin/products", requireAdmin, async (req, res) => {

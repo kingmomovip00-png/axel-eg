@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#121212">
   <title>AXEL | الإدارة</title>
   <link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"></head>
+<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png"><link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"></head>
 <body class="ax-admin">
   <header class="ax-header">
     <div class="ax-header-row">
@@ -47,7 +47,7 @@
             <h2>1. بيانات المنتج</h2>
             <div class="ax-grid two">
               <label>اسم المنتج <input name="name" required placeholder="اسم المنتج"></label>
-              <label>التصنيف <select name="category"><option>تصميمات</option><option>أنمي</option><option>تيشيرتات</option><option>هوديز</option></select></label>
+              <label>التصنيف <select name="category"><option>تصميمات</option><option>أنمي</option><option>تيشيرتات</option><option>هوديز</option><option>أرشيف الصيف</option></select></label>
               <label>سعر البيع <input name="salePrice" type="number" min="1" inputmode="numeric" required placeholder="530"></label>
               <label>السعر القديم <input name="oldPrice" type="number" min="0" inputmode="numeric" placeholder="اختياري"></label>
             </div>
@@ -101,7 +101,7 @@
         </form>
 
         <aside class="ax-card ax-list-card">
-          <div class="ax-list-head"><div><h2>المنتجات الحالية</h2><p>تعديل، استبدال أو حذف أي منتج.</p></div><button id="refreshProducts" type="button" class="ax-btn ax-btn-light">تحديث</button></div>
+          <div class="ax-list-head"><div><h2>المنتجات الحالية</h2><p>تعديل، استبدال أو حذف أي منتج.</p></div><div class="ax-form-actions"><button id="archiveSummerProducts" type="button" class="ax-btn ax-btn-light">نقل المنتجات الحالية لأرشيف الصيف</button><button id="refreshProducts" type="button" class="ax-btn ax-btn-light">تحديث</button></div></div>
           <div id="productsList" class="ax-manager-list"></div>
         </aside>
       </div>

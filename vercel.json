@@ -9,7 +9,9 @@
           "css/**",
           "js/**",
           "assets/**",
-          "*.html"
+          "*.html",
+          "favicon*",
+          "apple-touch-icon.png"
         ]
       }
     }

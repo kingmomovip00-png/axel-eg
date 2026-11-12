@@ -127,13 +127,14 @@ async function home() {
   try {
     const [{ products }, { banners }, { offers }] = await Promise.all([publicApi("/products"), publicApi("/banners"), publicApi("/offers")]);
     const shuffled = shuffle(products || []);
-    const designs = shuffled.filter(p => p.category !== "أنمي");
-    const anime = shuffled.filter(p => p.category === "أنمي");
+    // المنتجات الحالية تظهر في الأقسام الرئيسية، وأرشيف الصيف معزول تماماً.
+    const currentProducts = shuffled.filter(p => p.category !== "أرشيف الصيف");
+    const summerArchive = shuffled.filter(p => p.category === "أرشيف الصيف");
     const dEl = $("#productsDesigns"), mEl = $("#productsMixed"), aEl = $("#productsAnime");
-    if (dEl) dEl.innerHTML = designs.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
-    const mixed = shuffle([...(products || [])]).filter(p => Array.isArray(p.images) && p.images.some(x => x?.url));
-    if (mEl) { const mixedSource = mixed.length ? mixed : shuffle([...(products || [])]); mEl.innerHTML = mixedSource.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`; }
-    if (aEl) aEl.innerHTML = anime.map(card).join("") || `<p class="empty-state">لا توجد تصميمات أنمي حالياً</p>`;
+    if (dEl) dEl.innerHTML = currentProducts.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
+    const mixed = shuffle(currentProducts).filter(p => Array.isArray(p.images) && p.images.some(x => x?.url));
+    if (mEl) { const mixedSource = mixed.length ? mixed : shuffle(currentProducts); mEl.innerHTML = mixedSource.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`; }
+    if (aEl) aEl.innerHTML = summerArchive.map(card).join("") || `<p class="empty-state">لا توجد منتجات في أرشيف الصيف حالياً</p>`;
     setupBanners(banners || []);
     if (offers?.length && $("#offer")) { const o=offers[0]; $("#offer").classList.remove("hidden"); $("#offerTitle").textContent=o.title||"عرض محدود"; count(o.endsAt?.seconds ? o.endsAt.seconds*1000 : new Date(o.endsAt).getTime()); }
     setupSeeMore(); setupRail("designs"); loadHomeCoupon(); updateCartCount(); observeReveals();
