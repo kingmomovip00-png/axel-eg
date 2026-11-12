@@ -10,8 +10,12 @@
           "js/**",
           "assets/**",
           "*.html",
-          "favicon*",
-          "apple-touch-icon.png"
+          "favicon.ico",
+          "favicon-axel.ico",
+          "favicon*.png",
+          "apple-touch-icon.png",
+          "robots.txt",
+          "sitemap.xml"
         ]
       }
     }
