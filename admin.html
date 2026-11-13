@@ -55,7 +55,7 @@
             <h2>1. بيانات المنتج</h2>
             <div class="ax-grid two">
               <label>اسم المنتج <input name="name" required placeholder="اسم المنتج"></label>
-              <label>التصنيف <select name="category"><option>تصميمات</option><option>أنمي</option><option>تيشيرتات</option><option>هوديز</option><option>أرشيف الصيف</option></select></label>
+              <div class="ax-options-block ax-category-block"><span class="ax-label">التصنيف / أماكن ظهور المنتج <small class="ax-help">(اختر مكانًا واحدًا أو أكثر)</small></span><div id="categoryOptions" class="ax-checks"><label><input type="checkbox" value="تصميمات" checked><span>تصميمات</span></label><label><input type="checkbox" value="أنمي"><span>أنمي</span></label><label><input type="checkbox" value="تيشيرتات"><span>تيشيرتات</span></label><label><input type="checkbox" value="هوديز"><span>هوديز</span></label><label><input type="checkbox" value="أرشيف الصيف"><span>أرشيف الصيف</span></label></div></div>
               <label>سعر البيع <input name="salePrice" type="number" min="1" inputmode="numeric" required placeholder="530"></label>
               <label>السعر القديم <input name="oldPrice" type="number" min="0" inputmode="numeric" placeholder="اختياري"></label>
             </div>

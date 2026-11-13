@@ -122,14 +122,15 @@ function setupSeeMore(){
 
 async function loadHomeCoupon(){try{const {coupon}=await publicApi('/coupons/featured');const box=$('#homeCoupon');if(!box||!coupon)return;box.classList.remove('hidden');$('#homeCouponTitle').textContent=coupon.title||'خصم خاص';$('#homeCouponText').textContent=`${coupon.text||'استخدم الكود عند الطلب'}${coupon.type==='fixed'?` — خصم ${money(coupon.value)}`:` — خصم ${Number(coupon.value||0)}%`} ${Number(coupon.minQuantity||1)>1?`عند شراء ${Number(coupon.minQuantity)} قطع أو أكثر`:''}`;$('#homeCouponCode').textContent=coupon.code;$('#copyHomeCoupon').onclick=async()=>{try{await navigator.clipboard.writeText(coupon.code);showToast('تم نسخ الكود ✓')}catch{showToast(`الكود: ${coupon.code}`)}};}catch{}}
 
+const productCats = p => (Array.isArray(p?.categories) && p.categories.length) ? p.categories : [p?.category || ""];
 async function home() {
   fetch(`${API_URL}/visits`, { method: "POST" }).catch(() => {});
   try {
     const [{ products }, { banners }, { offers }] = await Promise.all([publicApi("/products"), publicApi("/banners"), publicApi("/offers")]);
     const shuffled = shuffle(products || []);
     // المنتجات الحالية تظهر في الأقسام الرئيسية، وأرشيف الصيف معزول تماماً.
-    const currentProducts = shuffled.filter(p => p.category !== "أرشيف الصيف");
-    const summerArchive = shuffled.filter(p => p.category === "أرشيف الصيف");
+    const currentProducts = shuffled.filter(p => productCats(p).some(c => c !== "أرشيف الصيف"));
+    const summerArchive = shuffled.filter(p => productCats(p).includes("أرشيف الصيف"));
     const dEl = $("#productsDesigns"), mEl = $("#productsMixed"), aEl = $("#productsAnime");
     if (dEl) dEl.innerHTML = currentProducts.map(card).join("") || `<p class="empty-state">لا توجد منتجات حالياً</p>`;
     const mixed = shuffle(currentProducts).filter(p => Array.isArray(p.images) && p.images.some(x => x?.url));
@@ -153,7 +154,7 @@ async function loadReviews(productId){
   render(pr,$('#productReviews'));render(all,$('#allReviews'));
 }
 
-async function setupProductSimilar(current){const el=$('#similarRail');if(!el)return;try{const {products=[]}=await publicApi('/products');const valid=(products||[]).filter(x=>x&&x.id!==current.id&&Array.isArray(x.images)&&x.images.some(im=>im?.url));let pool=shuffle(valid.filter(x=>x.category&&current.category&&x.category===current.category));if(pool.length<6)pool=shuffle([...pool,...valid.filter(x=>!pool.some(y=>y.id===x.id))]);pool=pool.slice(0,10);el.innerHTML=pool.length?pool.map((x,i)=>card(x,i)).join(''):'<p class="empty-state">لا توجد منتجات مشابهة حاليًا</p>';setupGenericRail(el)}catch(e){console.error('similar products',e);el.innerHTML='<p class="empty-state">تعذر تحميل المنتجات المشابهة</p>';}}
+async function setupProductSimilar(current){const el=$('#similarRail');if(!el)return;try{const {products=[]}=await publicApi('/products');const valid=(products||[]).filter(x=>x&&x.id!==current.id&&Array.isArray(x.images)&&x.images.some(im=>im?.url));let pool=shuffle(valid.filter(x=>x.category&&current.category&&productCats(x).some(c=>productCats(current).includes(c))));if(pool.length<6)pool=shuffle([...pool,...valid.filter(x=>!pool.some(y=>y.id===x.id))]);pool=pool.slice(0,10);el.innerHTML=pool.length?pool.map((x,i)=>card(x,i)).join(''):'<p class="empty-state">لا توجد منتجات مشابهة حاليًا</p>';setupGenericRail(el)}catch(e){console.error('similar products',e);el.innerHTML='<p class="empty-state">تعذر تحميل المنتجات المشابهة</p>';}}
 function setupGenericRail(el){let down=false,sx=0,ss=0;el.addEventListener('pointerdown',e=>{down=true;sx=e.clientX;ss=el.scrollLeft;el.setPointerCapture?.(e.pointerId)});el.addEventListener('pointermove',e=>{if(down)el.scrollLeft=ss-(e.clientX-sx)});el.addEventListener('pointerup',()=>down=false);el.addEventListener('pointercancel',()=>down=false)}
 async function product(){
   const id=new URLSearchParams(location.search).get('id'); if(!id||!$('#pname'))return;

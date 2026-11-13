@@ -326,7 +326,7 @@ app.post("/api/admin/products/archive-summer", requireAdmin, async (req, res) =>
     for (let i = 0; i < products.length; i += 450) {
       const batch = db.batch();
       products.slice(i, i + 450).forEach(doc => {
-        batch.update(doc.ref, { category: "أرشيف الصيف", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        batch.update(doc.ref, { category: "أرشيف الصيف", categories: ["أرشيف الصيف"], updatedAt: admin.firestore.FieldValue.serverTimestamp() });
         moved++;
       });
       await batch.commit();
@@ -352,12 +352,16 @@ app.post("/api/admin/products", requireAdmin, async (req, res) => {
     const colors = asArray(body.colors).map(String).filter(Boolean);
     const sizes = asArray(body.sizes).map(String).filter(Boolean);
     const stock = body.stock && typeof body.stock === "object" ? body.stock : {};
+    let cats = asArray(body.categories).map(String).map(x => x.trim()).filter(Boolean);
+    if (!cats.length) cats = [String(body.category || "تصميمات")];
+    cats = [...new Set(cats)];
     if (!name || !salePrice || !images.length || !colors.length || !sizes.length) {
       return res.status(400).json({ ok: false, error: "أكمل اسم المنتج والسعر والصور والألوان والمقاسات" });
     }
     const ref = await db.collection("products").add({
       name,
-      category: String(body.category || "تصميمات"),
+      category: cats[0],
+      categories: cats,
       salePrice,
       oldPrice: Number(body.oldPrice || 0),
       description: String(body.description || ""),
@@ -382,9 +386,13 @@ app.patch("/api/admin/products/:id", requireAdmin, async (req, res) => {
     const ref = db.collection("products").doc(req.params.id);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ ok: false, error: "المنتج غير موجود" });
-    const allowed = ["name", "category", "salePrice", "oldPrice", "description", "offerPrice", "offerColor", "images", "colors", "sizes", "stock", "active"];
+    const allowed = ["name", "category", "categories", "salePrice", "oldPrice", "description", "offerPrice", "offerColor", "images", "colors", "sizes", "stock", "active"];
     const patch = {};
     for (const key of allowed) if (key in (req.body || {})) patch[key] = req.body[key];
+    if ("categories" in patch) {
+      const c = [...new Set(asArray(patch.categories).map(String).map(x => x.trim()).filter(Boolean))];
+      if (c.length) { patch.categories = c; patch.category = c[0]; } else { delete patch.categories; }
+    }
     patch.updatedAt = admin.firestore.FieldValue.serverTimestamp();
     await ref.update(patch);
     res.json({ ok: true });

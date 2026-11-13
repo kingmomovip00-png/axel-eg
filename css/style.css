@@ -314,3 +314,4 @@ main, main *, .footer, .footer * { min-width:0; max-width:100%; }
 .header .nav .nav-left.nav-cart span { display:inline !important; }
 .header .nav .nav-left.nav-cart b { display:inline-grid !important; }
 @media (max-width:600px){ .header .nav .nav-left.nav-cart { left:8px !important; } .header .nav .nav-left.nav-cart .cart-header-icon { width:22px !important; height:22px !important; } .header .nav .nav-left.nav-cart span { display:none !important; } }
+.ax-category-block{grid-column:1/-1;margin-bottom:0}.ax-category-block .ax-help{font-weight:400;margin-inline-start:6px}
